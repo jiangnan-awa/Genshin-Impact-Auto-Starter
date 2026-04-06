@@ -1,0 +1,9 @@
+/.idea
+/.trae
+/.venv
+/accounts.json
+/build
+/chromedriver.exe
+/dist
+/venv_build
+/__pycache__
