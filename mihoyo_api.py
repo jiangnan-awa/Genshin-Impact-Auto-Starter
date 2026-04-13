@@ -115,7 +115,22 @@ class MihoyoClient:
             return
         try:
             from account_manager import account_manager
-            state = dict(self._get_daily_state(account_data))
+            # 注意：account_data 通常来自 get_accounts() 的一次性快照。
+            # 在同一次运行内对多个签到项依次调用 _update_daily_state 时，
+            # 如果仍然从 account_data 读取 daily_signin_state，会导致后写入的项
+            # 覆盖先前项（因为快照里没有包含刚写入的新状态）。
+            #
+            # 这里改为从存储中读取“最新状态”再合并写回，避免只保存一个项目。
+            latest_state = {}
+            try:
+                latest_accounts = account_manager.get_accounts() or []
+                latest_acc = next((a for a in latest_accounts if (a.get("id") or "") == acc_id), None)
+                if isinstance((latest_acc or {}).get("daily_signin_state"), dict):
+                    latest_state = dict(latest_acc["daily_signin_state"])
+            except Exception:
+                latest_state = dict(self._get_daily_state(account_data))
+
+            state = latest_state
             state[item_key] = {"date": self._today(), "status": status}
             account_manager.update_account(acc_id, daily_signin_state=state)
         except Exception:
