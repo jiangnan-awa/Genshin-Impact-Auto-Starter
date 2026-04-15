@@ -26,6 +26,14 @@ python -m pip install -U pip
 python -m pip install -r requirements.txt
 ```
 
+### GUI v2 依赖（customtkinter）
+
+新版 GUI（v2）基于 `customtkinter`，需要额外安装：
+
+```powershell
+python -m pip install customtkinter
+```
+
 ---
 
 ## 3. 运行方式（源码）
@@ -47,7 +55,24 @@ python gui.py
 
 说明：
 - 根目录 `gui.py` 是薄入口（用于保持 `python gui.py` 与 PyInstaller 入口兼容）
-- GUI 实际代码位于 `autostarter/gui/`
+- GUI v2 实际代码位于 `autostarter/gui_v2/`（默认）
+- legacy GUI 位于 `autostarter/gui/`（可回退）
+
+#### GUI v2 / legacy 切换
+
+- 默认启动 GUI v2（`autostarter/gui_v2/`）
+- 如需切回旧版（legacy GUI，`autostarter/gui/`），可使用：
+
+```powershell
+python gui.py --legacy
+```
+
+或通过环境变量：
+
+```powershell
+$env:AUTOSTARTER_GUI="legacy"
+python gui.py
+```
 
 ---
 

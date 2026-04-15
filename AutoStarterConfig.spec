@@ -8,7 +8,7 @@ a = Analysis(
     binaries=[],
     datas=[],
     # after refactor, all modules live under the `autostarter` package
-    hiddenimports=['yaml'] + collect_submodules('autostarter'),
+    hiddenimports=['yaml', 'customtkinter'] + collect_submodules('autostarter'),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

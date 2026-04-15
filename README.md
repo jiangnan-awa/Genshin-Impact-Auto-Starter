@@ -174,10 +174,14 @@ pyinstaller AutoStarter.spec
 核心逻辑已集中到 `autostarter/` 包内（即 `autostarter.*`），仓库根目录仅保留入口脚本与打包配置：
 
 - `main.py`：主程序入口脚本（实际调用 `autostarter.app_main:main`）
-- `gui.py`：配置界面入口脚本（薄入口，实际调用 `autostarter.gui.app:main`；可单独打包为 `AutoStarterConfig`，见 `AutoStarterConfig.spec`）
+- `gui.py`：配置界面入口脚本（薄入口）
+  - 默认启动 GUI v2：`autostarter.gui_v2.app:main`
+  - 传入 `--legacy` 或设置环境变量 `AUTOSTARTER_GUI=legacy` 可切回旧版 GUI：`autostarter.gui.app:main`
+  - 可单独打包为 `AutoStarterConfig`，见 `AutoStarterConfig.spec`
 - `autostarter/`：核心逻辑包（签到、启动、账号/配置、网络请求、日志等）
   - `app_main.py`：主流程 + 命令行参数解析
   - `gui/`：配置界面 GUI（已按 pages/widgets/style/bindings 拆分）
+  - `gui_v2/`：配置界面 GUI v2（customtkinter，侧边栏 + 分区页面，优先易用）
   - `account_manager.py` / `account.py`：账号与配置管理
   - `mihoyo_api.py` / `mihoyobbs.py` / `request.py`：米游社相关 API 与请求封装
   - `qr_login_handler.py`：扫码登录获取 `stoken`
