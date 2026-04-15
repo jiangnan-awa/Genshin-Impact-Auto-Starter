@@ -4,7 +4,7 @@ import string
 import time
 import uuid
 
-import setting
+from . import setting
 
 
 def md5(text: str) -> str:
@@ -93,4 +93,3 @@ def get_openssl_version() -> int:
         raise ImportError("Openssl Lib Error !!")
     temp_list = ssl.OPENSSL_VERSION_INFO
     return int(f"{str(temp_list[0])}{str(temp_list[1])}{str(temp_list[2])}")
-

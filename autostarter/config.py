@@ -3,7 +3,7 @@ import os
 import yaml
 from copy import deepcopy
 
-from loghelper import log
+from .loghelper import log
 
 # 这个字段现在还没找好塞什么地方好，就先塞config这里了
 serverless = False
@@ -233,4 +233,3 @@ def clear_cookie_cloudgame_zzz():
 
 if __name__ == "__main__":
     pass
-

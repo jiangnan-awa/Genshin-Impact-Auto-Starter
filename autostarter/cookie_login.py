@@ -1,11 +1,43 @@
 import time
-import winreg
 import os
 import sys
-import tkinter as tk
 import ctypes
-from tkinter import messagebox
-from selenium import webdriver
+
+try:
+    import winreg  # type: ignore
+except ModuleNotFoundError:  # 非 Windows 环境
+    winreg = None  # type: ignore
+
+try:
+    import tkinter as tk  # type: ignore
+    from tkinter import messagebox  # type: ignore
+except ModuleNotFoundError:  # 无图形环境 / 未安装 tkinter
+    tk = None  # type: ignore
+    messagebox = None  # type: ignore
+
+try:
+    from selenium import webdriver  # type: ignore
+    from selenium.webdriver.common.by import By  # type: ignore
+    from selenium.webdriver.support.ui import WebDriverWait  # type: ignore
+    from selenium.webdriver.support import expected_conditions as EC  # type: ignore
+
+    # Edge
+    from selenium.webdriver.edge.service import Service as EdgeService  # type: ignore
+    from selenium.webdriver.edge.options import Options as EdgeOptions  # type: ignore
+
+    # Chrome
+    from selenium.webdriver.chrome.service import Service as ChromeService  # type: ignore
+    from selenium.webdriver.chrome.options import Options as ChromeOptions  # type: ignore
+
+    # Firefox
+    from selenium.webdriver.firefox.service import Service as FirefoxService  # type: ignore
+    from selenium.webdriver.firefox.options import Options as FirefoxOptions  # type: ignore
+except ModuleNotFoundError:
+    webdriver = None  # type: ignore
+    By = WebDriverWait = EC = None  # type: ignore
+    EdgeService = EdgeOptions = None  # type: ignore
+    ChromeService = ChromeOptions = None  # type: ignore
+    FirefoxService = FirefoxOptions = None  # type: ignore
 
 # 尝试启用 High DPI 支持
 try:
@@ -16,26 +48,20 @@ except Exception:
     except Exception:
         pass
 
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-
-# Edge
-from selenium.webdriver.edge.service import Service as EdgeService
-from selenium.webdriver.edge.options import Options as EdgeOptions
-
-# Chrome
-from selenium.webdriver.chrome.service import Service as ChromeService
-from selenium.webdriver.chrome.options import Options as ChromeOptions
-
-# Firefox
-from selenium.webdriver.firefox.service import Service as FirefoxService
-from selenium.webdriver.firefox.options import Options as FirefoxOptions
-from driver_downloader import auto_setup_driver
+from .driver_downloader import auto_setup_driver
 import webbrowser
+
+
+def _require_gui_and_selenium():
+    if tk is None:
+        raise RuntimeError("当前环境缺少 tkinter，无法进行图形化 Cookie 登录。")
+    if webdriver is None:
+        raise RuntimeError("当前环境缺少 selenium，无法进行自动化 Cookie 登录。")
 
 def get_default_browser_type():
     """尝试从注册表获取默认浏览器类型"""
+    if winreg is None:
+        return None
     try:
         key_path = r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice"
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path) as key:
@@ -56,6 +82,8 @@ def get_default_browser_type():
 
 def show_manual_download_window(browser_name, download_url, driver_name):
     """显示手动下载引导窗口"""
+    if tk is None:
+        raise RuntimeError("当前环境缺少 tkinter，无法显示下载引导窗口。")
     root = tk.Tk()
     root.title("驱动下载协助")
     root.attributes('-topmost', True)
@@ -94,6 +122,7 @@ def show_manual_download_window(browser_name, download_url, driver_name):
 
 def create_driver(browser_type, status_win=None):
     """根据类型创建 Driver"""
+    _require_gui_and_selenium()
     if getattr(sys, 'frozen', False):
         base_path = os.path.dirname(sys.executable)
     else:
@@ -110,7 +139,7 @@ def create_driver(browser_type, status_win=None):
             driver_path = os.path.join(base_path, "chromedriver.exe")
             if not os.path.exists(driver_path):
                 if not auto_setup_driver('chrome', status_callback=lambda msg: update_status(status_win, msg)):
-                    from driver_downloader import get_chrome_version, get_chrome_download_url
+                    from .driver_downloader import get_chrome_version, get_chrome_download_url
                     ver = get_chrome_version()
                     url = get_chrome_download_url(ver) if ver else "https://googlechromelabs.github.io/chrome-for-testing/"
                     if ver and int(ver.split('.')[0]) >= 115:
@@ -147,7 +176,7 @@ def create_driver(browser_type, status_win=None):
             driver_path = os.path.join(base_path, "msedgedriver.exe")
             if not os.path.exists(driver_path):
                 if not auto_setup_driver('edge', status_callback=lambda msg: update_status(status_win, msg)):
-                    from driver_downloader import get_edge_version, get_edge_download_url
+                    from .driver_downloader import get_edge_version, get_edge_download_url
                     ver = get_edge_version()
                     url = get_edge_download_url(ver) if ver else "https://developer.microsoft.com/en-us/microsoft-edge/tools/webdriver/"
                     if status_win: status_win.destroy()

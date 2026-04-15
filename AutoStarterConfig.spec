@@ -1,24 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from PyInstaller.utils.hooks import collect_submodules
+
 a = Analysis(
     ['gui.py'],
     pathex=['.'],
     binaries=[],
     datas=[],
-    hiddenimports=[
-        'yaml',
-        'config',
-        'gamecheckin',
-        'mihoyobbs',
-        'login',
-        'error',
-        'captcha',
-        'account',
-        'request',
-        'setting',
-        'tools',
-        'loghelper',
-    ],
+    # after refactor, all modules live under the `autostarter` package
+    hiddenimports=['yaml'] + collect_submodules('autostarter'),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

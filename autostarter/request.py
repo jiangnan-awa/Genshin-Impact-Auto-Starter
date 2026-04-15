@@ -7,7 +7,7 @@ def get_new_session(**kwargs):
 
         http_client = httpx.Client(timeout=30, transport=httpx.HTTPTransport(retries=10), follow_redirects=True,
                                    **kwargs)
-        import tools
+        from . import tools
 
         if tools.get_openssl_version() < 102:
             httpx.get()
@@ -42,4 +42,3 @@ def get_new_session_use_proxy(http_proxy: str):
 
 
 http = get_new_session()
-

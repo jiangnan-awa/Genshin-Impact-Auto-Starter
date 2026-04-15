@@ -3,11 +3,14 @@ import os
 import sys
 import uuid
 import configparser
-from security import encrypt_cookie, decrypt_cookie
+import shutil
+from .security import encrypt_cookie, decrypt_cookie
 
 class AccountManager:
     def __init__(self):
-        self.config_file = ""
+        self.base_path = ""
+        self.accounts_file = ""
+        self.settings_file = ""
         self.old_config_file = ""
         self._init_path()
         self.accounts = []
@@ -66,35 +69,165 @@ class AccountManager:
             base_path = os.path.dirname(sys.executable)
         else:
             base_path = os.path.dirname(os.path.abspath(__file__))
-        self.config_file = os.path.join(base_path, 'accounts.json')
+
+        self.base_path = base_path
+        self.accounts_file = os.path.join(base_path, 'accounts.json')
+        self.settings_file = os.path.join(base_path, 'settings.json')
         self.old_config_file = os.path.join(base_path, 'config.ini')
 
+    def _override_base_path_for_tests(self, base_path: str) -> None:
+        """
+        仅供测试用：覆盖配置文件所在目录，避免污染真实环境。
+
+        tests/test_config_migration.py 会依赖该方法。
+        """
+        self.base_path = base_path
+        self.accounts_file = os.path.join(base_path, "accounts.json")
+        self.settings_file = os.path.join(base_path, "settings.json")
+        self.old_config_file = os.path.join(base_path, "config.ini")
+
     def load_data(self):
-        if os.path.exists(self.config_file):
-            try:
-                with open(self.config_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    if isinstance(data, dict):
-                        self.accounts = data.get('accounts', [])
-                        self.settings.update(data.get('settings', {}))
-                    elif isinstance(data, list):
-                        # 兼容旧版本列表格式
-                        self.accounts = data
-            except:
-                self.accounts = []
-        else:
-            self.accounts = []
+        """
+        读取账号与全局设置。
+
+        - accounts.json：仅账号列表（{"accounts": [...]} 或兼容旧版 list）
+        - settings.json：仅全局设置（dict）
+
+        自动迁移（兼容旧版混存格式）：
+        若检测到旧版 accounts.json 同时包含 accounts+settings 且 settings.json 不存在，则：
+        - 写入 settings.json
+        - 备份 accounts.json 为 accounts.json.bak
+        - 重写 accounts.json 为仅含 accounts
+        """
+        self._load_settings_file()
+        self._load_accounts_file_with_migration()
 
     def save_data(self):
+        ok_accounts = self._save_accounts_file()
+        ok_settings = self._save_settings_file()
+        return bool(ok_accounts and ok_settings)
+
+    def _load_settings_file(self):
+        if not os.path.exists(self.settings_file):
+            return
         try:
-            data = {
-                'accounts': self.accounts,
-                'settings': self.settings
-            }
-            with open(self.config_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+            with open(self.settings_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                # 覆盖默认值，但不替换整个 settings（保留默认字段）
+                self.settings.update(data)
+        except Exception:
+            # 读取失败：保留默认 settings
+            return
+
+    def _load_accounts_file_with_migration(self):
+        if not os.path.exists(self.accounts_file):
+            self.accounts = []
+            return
+
+        try:
+            with open(self.accounts_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            self.accounts = []
+            return
+
+        # 兼容旧版本列表格式
+        if isinstance(data, list):
+            self.accounts = data
+            return
+
+        if not isinstance(data, dict):
+            self.accounts = []
+            return
+
+        accounts = data.get("accounts", [])
+        legacy_settings = data.get("settings")
+
+        # 先加载账号（不管是否迁移都要可用）
+        self.accounts = accounts if isinstance(accounts, list) else []
+
+        # 自动迁移：accounts.json 混存 settings + settings.json 不存在
+        if isinstance(legacy_settings, dict) and not os.path.exists(self.settings_file):
+            self._migrate_legacy_accounts_json(data, legacy_settings)
+            # 迁移完成（或部分完成）后，仍然用 legacy settings 覆盖一次内存 settings，
+            # 保证本次运行行为与旧版一致。
+            self.settings.update(legacy_settings)
+
+    def _migrate_legacy_accounts_json(self, legacy_payload: dict, legacy_settings: dict) -> None:
+        """
+        将旧版 accounts.json（混存 accounts+settings）拆分为：
+        - accounts.json：仅含 accounts
+        - settings.json：仅含 settings
+
+        迁移策略（尽量安全）：
+        - 先写 settings.json
+        - 再备份 accounts.json -> accounts.json.bak
+        - 最后重写 accounts.json（仅账号）
+        任一步失败则尽量不破坏原 accounts.json。
+        """
+        # 1) 写 settings.json
+        try:
+            tmp_settings = self.settings_file + ".tmp"
+            with open(tmp_settings, "w", encoding="utf-8") as f:
+                json.dump(legacy_settings, f, ensure_ascii=False, indent=2)
+            os.replace(tmp_settings, self.settings_file)
+        except Exception:
+            # 写 settings.json 失败：不继续，避免破坏原 accounts.json
+            try:
+                if os.path.exists(tmp_settings):
+                    os.remove(tmp_settings)
+            except Exception:
+                pass
+            return
+
+        # 2) 备份 accounts.json
+        backup_path = self.accounts_file + ".bak"
+        try:
+            if os.path.exists(backup_path):
+                os.remove(backup_path)
+            shutil.copy2(self.accounts_file, backup_path)
+        except Exception:
+            # 备份失败：不重写 accounts.json（并尽量回滚 settings.json）
+            try:
+                if os.path.exists(self.settings_file):
+                    os.remove(self.settings_file)
+            except Exception:
+                pass
+            return
+
+        # 3) 重写 accounts.json 为仅账号
+        try:
+            tmp_accounts = self.accounts_file + ".tmp"
+            accounts_only = {"accounts": legacy_payload.get("accounts", [])}
+            with open(tmp_accounts, "w", encoding="utf-8") as f:
+                json.dump(accounts_only, f, ensure_ascii=False, indent=2)
+            os.replace(tmp_accounts, self.accounts_file)
+        except Exception:
+            # 重写失败：保留备份与 settings.json，原 accounts.json 仍在（可能未被替换）
+            try:
+                if os.path.exists(tmp_accounts):
+                    os.remove(tmp_accounts)
+            except Exception:
+                pass
+            return
+
+    def _save_accounts_file(self) -> bool:
+        try:
+            os.makedirs(os.path.dirname(self.accounts_file), exist_ok=True)
+            with open(self.accounts_file, "w", encoding="utf-8") as f:
+                json.dump({"accounts": self.accounts}, f, ensure_ascii=False, indent=2)
             return True
-        except:
+        except Exception:
+            return False
+
+    def _save_settings_file(self) -> bool:
+        try:
+            os.makedirs(os.path.dirname(self.settings_file), exist_ok=True)
+            with open(self.settings_file, "w", encoding="utf-8") as f:
+                json.dump(self.settings, f, ensure_ascii=False, indent=2)
+            return True
+        except Exception:
             return False
 
     def load_accounts(self):
@@ -102,7 +235,8 @@ class AccountManager:
         self.load_data()
 
     def save_accounts(self):
-        # 为了兼容性保留，实际调用 save_data
+        # 为了兼容性保留：旧版会把账号与设置一起写入一个文件。
+        # 新版拆分后仍保持“保存时尽量落盘所有数据”的行为。
         return self.save_data()
 
     def _migrate_from_old_config(self):
@@ -246,7 +380,8 @@ class AccountManager:
 
     def update_settings(self, **kwargs):
         self.settings.update(kwargs)
-        self.save_data()
+        # settings.json 仅用于全局设置，避免每次改设置都重写 accounts.json
+        self._save_settings_file()
 
     def parse_cookie(self, cookie_str):
         """从 Cookie 字符串中解析 stoken, mid, stuid 等"""

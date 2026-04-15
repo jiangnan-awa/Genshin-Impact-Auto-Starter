@@ -1,4 +1,4 @@
-from request import http
+from .request import http
 
 
 def game_captcha(gt: str, challenge: str) -> dict:
@@ -7,4 +7,3 @@ def game_captcha(gt: str, challenge: str) -> dict:
 
 def bbs_captcha(gt: str, challenge: str) -> dict:
     return None
-

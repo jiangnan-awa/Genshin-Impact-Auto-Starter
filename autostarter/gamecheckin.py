@@ -1,14 +1,15 @@
 import time
-import login
-import tools
-import config
 import random
-import captcha
-import setting
-from error import *
-from request import get_new_session
-from loghelper import log
-from account import get_account_list
+
+from . import login
+from . import tools
+from . import config
+from . import captcha
+from . import setting
+from .error import *
+from .request import get_new_session
+from .loghelper import log
+from .account import get_account_list
 
 
 class GameCheckin:

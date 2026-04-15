@@ -111,6 +111,34 @@ AutoStarter.exe --signin-only --no-onedragon
 
 ---
 
+## 配置文件说明（settings.json / accounts.json）
+
+程序运行目录下会生成两个 JSON 文件用于持久化数据：
+
+- `settings.json`：**全局设置**（启动模式、路径、签到顺序、每天只签到一次等）
+- `accounts.json`：**账号列表**（格式为 `{"accounts": [...]}`）
+
+### 旧版自动迁移（accounts.json 混存 settings）
+
+旧版本可能会把账号与设置一起写在 `accounts.json` 中：
+
+```jsonc
+{
+  "accounts": [...],
+  "settings": {...}
+}
+```
+
+新版启动时若检测到上述“混存格式”，且同目录下 **不存在** `settings.json`，会自动执行迁移：
+
+1. 从旧 `accounts.json` 中提取 `settings` 写入 `settings.json`
+2. 备份原 `accounts.json` 为 `accounts.json.bak`
+3. 将 `accounts.json` 重写为仅包含 `accounts`
+
+> 打包版（`AutoStarter.exe`）下，这些文件位于 exe 同目录；源码运行时位于 `autostarter/` 包所在目录（与 `autostarter/account_manager.py` 同级）。
+
+---
+
 ## 安全说明
 
 Cookie 使用 Windows DPAPI（`CryptProtectData`）加密后存储在本地配置文件中，仅当前 Windows 用户可解密，不会明文保存。
@@ -132,6 +160,29 @@ Cookie 使用 Windows DPAPI（`CryptProtectData`）加密后存储在本地配�
 ```bash
 pyinstaller AutoStarter.spec
 ```
+
+---
+
+## 项目结构（开发者）
+
+### 开发/调试文档
+
+源码运行与调试步骤见：[DEV.md](DEV.md)（Windows）。
+
+### 重构后的目录结构（`autostarter` 包）
+
+核心逻辑已集中到 `autostarter/` 包内（即 `autostarter.*`），仓库根目录仅保留入口脚本与打包配置：
+
+- `main.py`：主程序入口脚本（实际调用 `autostarter.app_main:main`）
+- `gui.py`：配置界面入口脚本（薄入口，实际调用 `autostarter.gui.app:main`；可单独打包为 `AutoStarterConfig`，见 `AutoStarterConfig.spec`）
+- `autostarter/`：核心逻辑包（签到、启动、账号/配置、网络请求、日志等）
+  - `app_main.py`：主流程 + 命令行参数解析
+  - `gui/`：配置界面 GUI（已按 pages/widgets/style/bindings 拆分）
+  - `account_manager.py` / `account.py`：账号与配置管理
+  - `mihoyo_api.py` / `mihoyobbs.py` / `request.py`：米游社相关 API 与请求封装
+  - `qr_login_handler.py`：扫码登录获取 `stoken`
+  - `launcher.py`：启动流程与等待逻辑
+  - 其它模块：按功能拆分（安全、工具、驱动下载等）
 
 ---
 

@@ -1,11 +1,11 @@
 import re
 from copy import deepcopy
 
-import config
-import setting
-from error import CookieError, StokenError
-from loghelper import log
-from request import http
+from . import config
+from . import setting
+from .error import CookieError, StokenError
+from .loghelper import log
+from .request import http
 
 headers = setting.headers.copy()
 headers.pop("DS")
@@ -110,4 +110,3 @@ def get_stoken_cookie() -> str:
             log.error(f"v2_stoken 需要 mid 参数")
             raise CookieError(f"cookie require mid parament")
     return cookie
-

@@ -8,10 +8,10 @@ import requests
 import re
 from datetime import date
 
-import config as bbs_config
-import gamecheckin as bbs_gamecheckin
-import mihoyobbs as bbs_mihoyobbs
-import error as bbs_error
+from . import config as bbs_config
+from . import gamecheckin as bbs_gamecheckin
+from . import mihoyobbs as bbs_mihoyobbs
+from . import error as bbs_error
 
 GAME_CONFIGS = {
     'genshin': {
@@ -69,7 +69,7 @@ class MihoyoClient:
     def _should_skip_item_today(self, account_data, item: str) -> str:
         item_key = "miyoushe" if (item or "").strip().lower() in {"miyoushe", "bbs"} else (item or "").strip().lower()
         try:
-            from account_manager import account_manager
+            from .account_manager import account_manager
             settings = account_manager.get_settings() or {}
         except Exception:
             settings = {}
@@ -114,7 +114,7 @@ class MihoyoClient:
         if not acc_id:
             return
         try:
-            from account_manager import account_manager
+            from .account_manager import account_manager
             # 注意：account_data 通常来自 get_accounts() 的一次性快照。
             # 在同一次运行内对多个签到项依次调用 _update_daily_state 时，
             # 如果仍然从 account_data 读取 daily_signin_state，会导致后写入的项
@@ -376,7 +376,7 @@ class MihoyoClient:
     def _normalize_miyoushe_cookie_for_bbs(self, cookie: str) -> str:
         if not cookie:
             return ""
-        from account_manager import account_manager
+        from .account_manager import account_manager
         fields = account_manager.parse_cookie(cookie)
         stuid = fields.get("stuid") or ""
         mid = fields.get("mid") or ""
@@ -419,7 +419,7 @@ class MihoyoClient:
                 return cookie
 
             bbs_config.serverless = True
-            import login as bbs_login
+            from . import login as bbs_login
             cookie_token = bbs_login.get_cookie_token_by_stoken()
             cookie_token = (cookie_token or "").strip()
             if cookie_token:
@@ -443,7 +443,7 @@ class MihoyoClient:
             return ["Cookie 无效或为空"]
 
         if not game_cookie and miyoushe_cookie:
-            from account_manager import account_manager
+            from .account_manager import account_manager
             fields = account_manager.parse_cookie(miyoushe_cookie)
             if fields.get("ltoken") or fields.get("cookie_token"):
                 game_cookie = miyoushe_cookie
@@ -468,7 +468,7 @@ class MihoyoClient:
         # 2. 执行米游社签到 (使用 miyoushe_cookie)
         if enable_miyoushe:
             try:
-                from account_manager import account_manager
+                from .account_manager import account_manager
                 fields = account_manager.parse_cookie(miyoushe_cookie)
                 stoken = fields.get("stoken") or fields.get("stoken_v2") or fields.get("stoken_v1")
                 if not stoken:
@@ -502,7 +502,7 @@ class MihoyoClient:
             return ["Cookie 无效或为空"]
 
         if not game_cookie and miyoushe_cookie:
-            from account_manager import account_manager
+            from .account_manager import account_manager
             fields = account_manager.parse_cookie(miyoushe_cookie)
             if fields.get("ltoken") or fields.get("cookie_token"):
                 game_cookie = miyoushe_cookie
@@ -563,7 +563,7 @@ class MihoyoClient:
             if not enable_miyoushe:
                 return ["米游社: 未启用"]
             try:
-                from account_manager import account_manager
+                from .account_manager import account_manager
                 fields = account_manager.parse_cookie(miyoushe_cookie)
                 stoken = fields.get("stoken") or fields.get("stoken_v2") or fields.get("stoken_v1")
                 if not stoken:

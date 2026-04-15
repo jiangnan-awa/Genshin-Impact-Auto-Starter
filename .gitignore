@@ -2,8 +2,14 @@
 /.trae
 /.venv
 /accounts.json
+/settings.json
+/accounts.json.bak
 /build
 /chromedriver.exe
 /dist
 /venv_build
 /__pycache__
+.pytest_cache/
+*.py[cod]
+*.log
+.DS_Store

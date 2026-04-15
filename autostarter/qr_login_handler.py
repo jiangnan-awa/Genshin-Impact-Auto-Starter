@@ -8,9 +8,6 @@ from io import StringIO
 from string import ascii_letters, digits
 from typing import Callable, Optional, Tuple
 
-import httpx
-from qrcode.main import QRCode
-
 
 APP_VERSION = "2.71.1"
 DEVICE_NAME = "Xiaomi MI 6"
@@ -30,6 +27,8 @@ def _get_ds2(query: str = "", body: str = "") -> str:
 
 
 def create_qr_session(timeout: float = 10.0) -> Tuple[str, str, str, str]:
+    import httpx
+
     app_id = "2"
     device = "".join(random.choices((ascii_letters + digits), k=64))
     payload = {"app_id": app_id, "device": device}
@@ -43,6 +42,8 @@ def create_qr_session(timeout: float = 10.0) -> Tuple[str, str, str, str]:
 
 
 def build_qr_image_and_ascii(qr_url: str):
+    from qrcode.main import QRCode
+
     qr = QRCode()
     qr.add_data(qr_url)
     image = qr.make_image()
@@ -59,6 +60,8 @@ def poll_qr_login(
     timeout_seconds: int = 180,
     status_callback: Optional[Callable[[str], None]] = None,
 ) -> Tuple[str, str]:
+    import httpx
+
     deadline = time.time() + max(1, int(timeout_seconds))
     with httpx.Client(timeout=10.0) as client:
         while True:
@@ -88,6 +91,8 @@ def poll_qr_login(
 
 
 def get_stoken_by_game_token(uid: str, game_token: str, timeout: float = 10.0) -> Tuple[str, str]:
+    import httpx
+
     headers = {
         "x-rpc-app_version": APP_VERSION,
         "DS": None,

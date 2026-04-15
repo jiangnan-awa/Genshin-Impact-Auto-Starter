@@ -1,4 +1,4 @@
-from autostarter.app_main import main
+from .app_main import main
 
 
 if __name__ == "__main__":

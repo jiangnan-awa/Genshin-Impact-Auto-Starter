@@ -2,19 +2,28 @@ import os
 import sys
 import requests
 import zipfile
-import winreg
 import platform
 import subprocess
 import re
-from tqdm import tqdm
+
+try:
+    import winreg  # type: ignore
+except ModuleNotFoundError:
+    winreg = None  # type: ignore
+
+try:
+    from tqdm import tqdm  # type: ignore
+except ModuleNotFoundError:
+    tqdm = None  # type: ignore
 
 def get_chrome_version():
     """获取本地 Chrome 浏览器版本"""
     try:
         # 尝试从注册表获取
-        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Google\Chrome\BLBeacon")
-        version, _ = winreg.QueryValueEx(key, "version")
-        return version
+        if winreg is not None:
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Google\Chrome\BLBeacon")
+            version, _ = winreg.QueryValueEx(key, "version")
+            return version
     except:
         try:
             # 尝试从文件路径获取
@@ -34,9 +43,10 @@ def get_chrome_version():
 def get_edge_version():
     """获取本地 Edge 浏览器版本"""
     try:
-        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Edge\BLBeacon")
-        version, _ = winreg.QueryValueEx(key, "version")
-        return version
+        if winreg is not None:
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Edge\BLBeacon")
+            version, _ = winreg.QueryValueEx(key, "version")
+            return version
     except:
         try:
             path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"

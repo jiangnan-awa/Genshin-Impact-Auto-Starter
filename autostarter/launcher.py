@@ -3,8 +3,8 @@ import shlex
 import subprocess
 import time
 import threading
-from loghelper import log
-from account_manager import account_manager
+from .loghelper import log
+from .account_manager import account_manager
 
 class GameLauncher:
     def __init__(self):

@@ -3,14 +3,14 @@ import random
 import time
 from copy import deepcopy
 
-import captcha
-import config
-import login
-import setting
-import tools
-from error import StokenError
-from loghelper import log
-from request import http
+from . import captcha
+from . import config
+from . import login
+from . import setting
+from . import tools
+from .error import StokenError
+from .loghelper import log
+from .request import http
 
 
 def wait():

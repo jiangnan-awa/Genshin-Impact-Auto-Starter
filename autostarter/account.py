@@ -1,9 +1,9 @@
-import login
-import config
-import setting
-from error import CookieError
-from loghelper import log
-from request import get_new_session
+from . import login
+from . import config
+from . import setting
+from .error import CookieError
+from .loghelper import log
+from .request import get_new_session
 
 
 def get_account_list(game_id: str, headers: dict, update: bool = False) -> list:
@@ -32,4 +32,3 @@ def get_account_list(game_id: str, headers: dict, update: bool = False) -> list:
 
     log.info(f"已获取到 {len(account_list)} 个「{setting.game_id2name.get(game_id, game_id)}」账号信息")
     return account_list
-
