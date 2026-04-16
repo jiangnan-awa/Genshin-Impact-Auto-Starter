@@ -268,7 +268,7 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
             qr_frame.grid(row=2, column=0, padx=14, pady=(0, 10), sticky="ew")
             qr_frame.grid_columnconfigure(0, weight=1)
 
-            qr_img_label = ctk.CTkLabel(master=qr_frame, text="")
+            qr_img_label = ctk.CTkLabel(master=qr_frame, text="", width=260, height=260)
             qr_img_label.grid(row=0, column=0, sticky="ew")
 
             qr_url_row = ctk.CTkFrame(master=qr_frame, fg_color="transparent")
@@ -340,12 +340,32 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
 
                 def _apply():
                     try:
+                        # qrcode 的 make_image() 可能返回包装对象（如 qrcode.image.pil.PilImage）
+                        # 这里尽量转换为真正的 PIL.Image.Image，避免 CTkImage 渲染失败。
+                        img = pil_image
+                        if hasattr(img, "get_image"):
+                            img = img.get_image()
+                        if hasattr(img, "convert"):
+                            img = img.convert("RGBA")
+
                         # PIL image -> CTkImage -> CTkLabel
-                        ctk_img = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=(260, 260))
+                        ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(260, 260))
                         qr_img_label.configure(image=ctk_img, text="")
                         # 防止被 GC 回收
                         setattr(qr_img_label, "_ctk_img_ref", ctk_img)
                     except Exception:
+                        # 渲染失败时：展示链接作为兜底
+                        try:
+                            lbl_status.configure(text="二维码图片渲染失败，已改用链接方式（可复制链接在浏览器打开扫码）。")
+                        except Exception:
+                            pass
+                        try:
+                            # 若已存 URL，则展示出来
+                            if qr_url_value.get("url"):
+                                qr_url_label.configure(text=qr_url_value.get("url", ""))
+                                qr_url_row.grid()
+                        except Exception:
+                            pass
                         return
 
                 try:
@@ -353,7 +373,7 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
                 except Exception:
                     pass
 
-            def set_qr_url(self, url: str) -> None:
+            def set_qr_url(self, url: str, show_row: bool = True) -> None:
                 if not enable_qr or qr_url_row is None or qr_url_label is None:
                     return
 
@@ -363,10 +383,11 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
                         qr_url_label.configure(text=url or "")
                     except Exception:
                         pass
-                    try:
-                        qr_url_row.grid()
-                    except Exception:
-                        return
+                    if show_row:
+                        try:
+                            qr_url_row.grid()
+                        except Exception:
+                            return
 
                 try:
                     win.after(0, _apply)  # type: ignore[attr-defined]
@@ -535,6 +556,12 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
 
             status_cb("正在创建扫码会话…")
             qr_url, app_id, ticket, device = qr.create_qr_session()
+            # 先缓存 URL（默认不显示），用于图片渲染失败时兜底展示/复制
+            try:
+                if hasattr(status_cb, "set_qr_url"):
+                    status_cb.set_qr_url(qr_url, show_row=False)  # type: ignore[attr-defined]
+            except Exception:
+                pass
 
             # 展示二维码（图片）；失败兜底展示 URL + 复制链接按钮
             try:
@@ -545,7 +572,7 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
             except Exception:
                 status_cb("无法生成二维码图片（可能缺少 qrcode/PIL），请使用链接在浏览器打开后扫码。")
                 if hasattr(status_cb, "set_qr_url"):
-                    status_cb.set_qr_url(qr_url)  # type: ignore[attr-defined]
+                    status_cb.set_qr_url(qr_url, show_row=True)  # type: ignore[attr-defined]
                 else:
                     status_cb(f"二维码 URL：{qr_url}")
 
