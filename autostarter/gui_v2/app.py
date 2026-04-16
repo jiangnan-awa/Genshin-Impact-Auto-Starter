@@ -66,8 +66,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # 延后导入：避免 import 阶段引入 GUI 副作用
     from . import dpi
     from .bindings import bind_default_shortcuts
-    from .pages import accounts, launch, mod, signin
-    from .widgets.sidebar import SidebarSpec, build_sidebar
+    from .pages import accounts, launch, mod, presets, signin
+    from .widgets.sidebar import SidebarNavItem, SidebarSpec, build_sidebar
     from .widgets.toast import ToastManager, build_toast_bar
 
     # Windows 高 DPI：尽量在创建窗口之前调用
@@ -129,6 +129,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "launch": launch.build_page,
         "mod": mod.build_page,
         "signin": signin.build_page,
+        "presets": presets.build_page,
     }
 
     def show_page(key: str) -> None:
@@ -164,7 +165,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             pass
 
     # Sidebar（左侧）
-    sidebar = build_sidebar(body, SidebarSpec(active_key="accounts", on_navigate=on_navigate))
+    sidebar = build_sidebar(
+        body,
+        SidebarSpec(
+            items=[
+                SidebarNavItem("accounts", "账号管理"),
+                SidebarNavItem("launch", "启动设置"),
+                SidebarNavItem("mod", "Mod 设置"),
+                SidebarNavItem("signin", "签到设置"),
+                SidebarNavItem("presets", "预设"),
+            ],
+            active_key="accounts",
+            on_navigate=on_navigate,
+        ),
+    )
     sidebar.frame.grid(row=0, column=0, sticky="nsw")
 
     # 默认页面

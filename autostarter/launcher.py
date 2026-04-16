@@ -10,9 +10,10 @@ class GameLauncher:
     def __init__(self):
         self._launcher_thread = None
 
-    def launch(self, force_mod: bool = False, no_onedragon: bool = False):
+    def launch(self, force_mod: bool = False, no_onedragon: bool = False, settings: dict | None = None):
         """根据配置启动游戏"""
-        settings = account_manager.get_settings()
+        if settings is None:
+            settings = account_manager.get_settings()
         
         # 1. 启动 Mod
         self._launch_mod(settings, force_mod=force_mod)

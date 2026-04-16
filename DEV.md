@@ -85,6 +85,7 @@ python gui.py
 | `--signin-only` / `-s` | 仅执行签到，不启动游戏 |
 | `--mod` / `--mod-mode` | 临时强制启用 Mod 启动模式（无视配置） |
 | `--no-onedragon` / `--skip-onedragon` | 跳过一条龙任务，直接按普通方式启动 BetterGI |
+| `--preset <id>` / `--preset=<id>` | 使用指定「启动预设」启动（来自 `presets.json`）。传入后将**不弹出** Windows 的“本次临时开关”窗口 |
 
 示例：
 
@@ -93,7 +94,14 @@ python -m autostarter --signin-only
 python main.py --mod-mode
 python main.py --no-onedragon
 python main.py --signin-only --no-onedragon
+python main.py --preset <id>
 ```
+
+### 4.1 Windows：无 preset 才弹窗的“临时开关”
+
+在 Windows 上，如果**未**传入 `--preset`，主程序启动时会弹出一个简易窗口让用户选择“仅本次运行生效”的临时开关（仅签到 / 跳过一条龙 / 强制 Mod），并且**不会写入** `settings.json`。
+
+当传入 `--preset <id>` 时，为了便于桌面快捷方式/计划任务等无交互场景，上述弹窗会被抑制。
 
 ---
 
@@ -158,3 +166,42 @@ python main.py --signin-only --no-onedragon
 1. 生成 `settings.json`（从旧文件拆分出来）
 2. 备份原 `accounts.json` 为 `accounts.json.bak`
 3. 将 `accounts.json` 重写为仅含 `accounts`
+
+---
+
+## 7. 启动预设（presets.json）
+
+启动预设用于保存“启动相关设置”的多个方案（BetterGI/外置启动器/Mod 等），便于一键启动或做桌面快捷方式。
+
+- 实现：`/workspace/Genshin-Impact-Auto-Starter-clean/autostarter/presets.py`（`PresetManager`）
+- 文件名：`presets.json`
+- 位置：与 `settings.json` / `accounts.json` 同目录
+  - frozen（PyInstaller 打包）环境：`sys.executable` 所在目录
+  - 源码运行：`autostarter/` 包目录
+
+数据结构（`version=1`）：
+
+```jsonc
+{
+  "version": 1,
+  "active_preset_id": "",
+  "presets": [
+    {
+      "id": "uuid-hex",
+      "name": "显示名称",
+      "settings": { "bettergi_enabled": true, "...": "..." },
+      "created_at": "2026-04-16T00:00:00Z",
+      "updated_at": "2026-04-16T00:00:00Z"
+    }
+  ]
+}
+```
+
+### GUI v2：预设页
+
+GUI v2 的预设页位于：`/workspace/Genshin-Impact-Auto-Starter-clean/autostarter/gui_v2/pages/presets.py`，提供：
+
+- 预设管理（新建/从当前配置生成/复制/重命名/删除）
+- `▶ 一键启动`：直接调用 `game_launcher.launch(settings=preset_settings)`（后台线程）
+- Windows 打包版生成桌面快捷方式：仅 `sys.platform == "win32"` 且 `sys.frozen == True` 时可用  
+  - 通过 PowerShell + `WScript.Shell` 生成 `.lnk`，参数为 `--preset <id>`

@@ -80,6 +80,7 @@
 | `--signin-only` / `-s` | 仅执行签到，不启动游戏 |
 | `--mod` / `--mod-mode` | 临时强制启用 Mod 启动模式（无视配置） |
 | `--no-onedragon` / `--skip-onedragon` | 跳过一条龙任务，直接按普通方式启动 BetterGI |
+| `--preset <id>` / `--preset=<id>` | 使用指定「启动预设」启动（来自 `presets.json`）。传入后将**不弹出** Windows 的“本次临时开关”窗口，适合做桌面快捷方式/计划任务 |
 
 示例：
 
@@ -88,6 +89,7 @@ AutoStarter.exe --signin-only
 AutoStarter.exe --mod-mode
 AutoStarter.exe --no-onedragon
 AutoStarter.exe --signin-only --no-onedragon
+AutoStarter.exe --preset <id>
 ```
 
 ---
@@ -139,7 +141,34 @@ AutoStarter.exe --signin-only --no-onedragon
 
 ---
 
-## 安全说明
+## 启动预设（presets.json）
+
+从近期版本开始，启动器支持“启动预设”（Launch Presets）：把一套启动相关设置（BetterGI 路径、一条龙、外置启动器、Mod 等）保存为独立条目，便于在不同场景间一键切换/一键启动。
+
+- 配置文件：`presets.json`
+- 位置规则：与 `settings.json` / `accounts.json` **同目录**
+  - 打包版（`AutoStarter.exe`）：在 exe 同目录
+  - 源码运行：在 `autostarter/` 包目录（与 `autostarter/presets.py` 同级）
+
+### GUI v2：预设页
+
+打开配置界面（默认 GUI v2）后，在左侧导航进入「预设」页，可进行：
+
+- 预设列表管理：新建空白 / 从当前 `settings.json` 生成 / 复制 / 重命名 / 删除
+- 设为默认：在 `presets.json` 中记录 `active_preset_id`
+- `▶ 一键启动`：使用该预设的 settings 立即启动（后台线程执行并 toast 提示）
+- Windows 打包版：可为任意预设「生成桌面快捷方式」（`.lnk`）
+  - 快捷方式实质等价于：`AutoStarter.exe --preset <id>`
+
+### 命令行：--preset <id>
+
+当通过命令行传入 `--preset <id>` 时：
+
+- 主程序将从 `presets.json` 读取该预设的 settings，并用它执行本次启动
+- **不会弹出** Windows 的“本次临时开关（仅本次运行，不写入配置）”窗口（方便无交互启动）
+
+---
+
 
 Cookie 使用 Windows DPAPI（`CryptProtectData`）加密后存储在本地配置文件中，仅当前 Windows 用户可解密，不会明文保存。
 

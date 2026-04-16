@@ -10,6 +10,6 @@ __all__ = [
     "accounts",
     "launch",
     "mod",
+    "presets",
     "signin",
 ]
-
