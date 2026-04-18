@@ -3,8 +3,8 @@ import shlex
 import subprocess
 import time
 import threading
-from .loghelper import log
 from .account_manager import account_manager
+from .log_actions import log_action
 
 class GameLauncher:
     def __init__(self):
@@ -28,8 +28,13 @@ class GameLauncher:
             except Exception:
                 wait_seconds = 5
             if wait_seconds > 0:
-                log.info(f"外置启动器已启动，等待 {wait_seconds} 秒...")
-                time.sleep(wait_seconds)
+                log_action("Launcher", "external_launcher_wait", "start", seconds=int(wait_seconds))
+                try:
+                    time.sleep(wait_seconds)
+                except Exception as e:
+                    log_action("Launcher", "external_launcher_wait", "fail", seconds=int(wait_seconds), reason=str(e))
+                    raise
+                log_action("Launcher", "external_launcher_wait", "ok", seconds=int(wait_seconds))
 
         # 3. 启动 BetterGI 或 直接启动原神
         if settings.get('bettergi_enabled', True):
@@ -38,10 +43,16 @@ class GameLauncher:
             self._launch_genshin(settings)
 
     def _launch_mod(self, settings, force_mod: bool = False):
-        if not (settings.get("mod_enabled", False) or force_mod):
+        enabled = bool(settings.get("mod_enabled", False) or force_mod)
+        if not enabled:
+            log_action("Launcher", "Mod", "skip", reason="disabled", method="cmdline", force_mod=bool(force_mod))
             return
         mod_path = (settings.get("mod_path") or "").strip()
-        if not mod_path or not os.path.exists(mod_path):
+        if not mod_path:
+            log_action("Launcher", "Mod", "skip", reason="path_empty", method="cmdline", force_mod=bool(force_mod))
+            return
+        if not os.path.exists(mod_path):
+            log_action("Launcher", "Mod", "skip", reason="path_not_exists", method="cmdline", force_mod=bool(force_mod))
             return
         wait_seconds = settings.get("mod_wait_seconds", 6)
         try:
@@ -50,6 +61,15 @@ class GameLauncher:
             wait_seconds = 6
         if wait_seconds < 0:
             wait_seconds = 0
+        log_action(
+            "Launcher",
+            "Mod",
+            "start",
+            method="cmdline",
+            file=os.path.basename(mod_path),
+            wait_seconds=int(wait_seconds),
+            force_mod=bool(force_mod),
+        )
         try:
             ext = os.path.splitext(mod_path)[1].lower()
             cwd = os.path.dirname(mod_path)
@@ -63,7 +83,26 @@ class GameLauncher:
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                  creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
             time.sleep(wait_seconds)
+            log_action(
+                "Launcher",
+                "Mod",
+                "ok",
+                method="cmdline",
+                file=os.path.basename(mod_path),
+                wait_seconds=int(wait_seconds),
+                force_mod=bool(force_mod),
+            )
         except Exception:
+            log_action(
+                "Launcher",
+                "Mod",
+                "fail",
+                method="cmdline",
+                file=os.path.basename(mod_path),
+                wait_seconds=int(wait_seconds),
+                force_mod=bool(force_mod),
+                reason="exception",
+            )
             return
 
     def _launch_bettergi(self, settings, no_onedragon: bool = False):
@@ -73,22 +112,73 @@ class GameLauncher:
         bettergi_path = settings.get('bettergi_path')
 
         if not onedragon_enabled:
-            self._do_launch_bettergi(bettergi_path, False, "")
-            return
+            return self._do_launch_bettergi(bettergi_path, False, "")
 
         if onedragon_config_2 and bettergi_path and os.path.exists(bettergi_path):
+            log_action(
+                "Launcher",
+                "BetterGI",
+                "start",
+                method="cmdline",
+                onedragon=True,
+                mode="two_stage",
+                has_config2=True,
+            )
             self._launcher_thread = threading.Thread(
                 target=self._run_and_wait_for_next, 
                 args=(bettergi_path, onedragon_config_1, onedragon_config_2), 
                 daemon=False
             )
             self._launcher_thread.start()
+            log_action(
+                "Launcher",
+                "BetterGI",
+                "ok",
+                method="cmdline",
+                onedragon=True,
+                mode="two_stage",
+                has_config2=True,
+            )
+            return True
         else:
-            self._do_launch_bettergi(bettergi_path, True, onedragon_config_1)
+            return self._do_launch_bettergi(bettergi_path, True, onedragon_config_1)
 
     def _do_launch_bettergi(self, bettergi_path, onedragon_enabled, config_name):
         """实际执行启动逻辑 (Detached 模式，不阻塞)"""
-        log.info(f"正在启动 BetterGI: 路径={bettergi_path}, 一条龙={onedragon_enabled}, 配置={config_name}")
+        # 注意：不记录完整路径与配置内容，避免泄露敏感信息/可识别信息
+        log_action(
+            "Launcher",
+            "BetterGI",
+            "start",
+            method="cmdline" if (bettergi_path and os.path.exists(bettergi_path)) else "urlscheme",
+            onedragon=bool(onedragon_enabled),
+            has_path=bool(bettergi_path),
+            has_config=bool((config_name or "").strip()),
+        )
+
+        # 关键行为：当用户指定了一条龙“配置名称”时，必须通过 BetterGI.exe 命令行启动，
+        # 否则回退 URL Scheme 会导致运行 BetterGI 页面“当前选中配置”，与用户预期不符。
+        if onedragon_enabled and (config_name or "").strip():
+            if not bettergi_path or not os.path.exists(bettergi_path):
+                log_action(
+                    "Launcher",
+                    "BetterGI",
+                    "fail",
+                    method="cmdline",
+                    onedragon=True,
+                    reason="bettergi_path_invalid_for_config",
+                )
+                try:
+                    import sys
+
+                    print(
+                        "已指定一条龙配置名称，但 BetterGI 路径无效/未设置："
+                        "无法执行 `BetterGI.exe startOneDragon <配置名称>`，已中止启动（不会回退 URL Scheme）。",
+                        file=sys.stderr,
+                    )
+                except Exception:
+                    pass
+                return False
         
         # 优先使用可执行文件命令行启动
         if bettergi_path and os.path.exists(bettergi_path):
@@ -101,19 +191,50 @@ class GameLauncher:
                 else:
                     cmd.append("start")
                 
-                log.info(f"正在通过命令行启动 BetterGI: {' '.join(cmd)}")
+                log_action(
+                    "Launcher",
+                    "BetterGI",
+                    "start",
+                    method="cmdline",
+                    onedragon=bool(onedragon_enabled),
+                    has_config=bool((config_name or "").strip()),
+                )
                 # 使用 Popen 启动并彻底隔离，不阻塞主进程，且主进程退出后不影响子进程
                 subprocess.Popen(cmd, cwd=os.path.dirname(bettergi_path), close_fds=True,
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                  creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
                 time.sleep(2)
-                log.info("BetterGI 已成功通过命令行拉起")
+                log_action(
+                    "Launcher",
+                    "BetterGI",
+                    "ok",
+                    method="cmdline",
+                    onedragon=bool(onedragon_enabled),
+                    has_config=bool((config_name or "").strip()),
+                )
                 return True
             except Exception as e:
-                log.error(f"通过命令行启动 BetterGI 失败: {e}")
+                log_action(
+                    "Launcher",
+                    "BetterGI",
+                    "fail",
+                    method="cmdline",
+                    onedragon=bool(onedragon_enabled),
+                    reason=str(e),
+                )
+                # 当指定了配置名称时，不允许回退 URL Scheme（会运行错误的配置）
+                if onedragon_enabled and (config_name or "").strip():
+                    log_action(
+                        "Launcher",
+                        "BetterGI",
+                        "fail",
+                        method="cmdline",
+                        onedragon=True,
+                        reason="cmdline_failed_and_config_forbids_fallback",
+                    )
+                    return False
         
         # 命令行启动失败或无路径，尝试 URL Scheme 启动
-        log.info("尝试通过 URL Scheme 启动 BetterGI")
         return self._try_launch_via_url(onedragon_enabled, config_name)
 
     def _run_and_wait_for_next(self, bettergi_path, config_1, config_2):
@@ -124,7 +245,7 @@ class GameLauncher:
             if config_1:
                 cmd.append(config_1)
             
-            log.info(f"正在启动 BetterGI 并监听第一个任务: {' '.join(cmd)}")
+            log_action("Launcher", "BetterGI", "start", method="cmdline", onedragon=True, mode="two_stage")
             
             # 为了能读到输出，不使用 DETACHED_PROCESS
             process = subprocess.Popen(
@@ -147,11 +268,11 @@ class GameLauncher:
                 print(f"[BetterGI] {line.strip()}")
                 
                 if "一条龙和配置组任务结束" in line:
-                    log.info("检测到 BetterGI 结束标志: '一条龙和配置组任务结束'")
+                    log_action("Launcher", "BetterGI", "ok", method="cmdline", onedragon=True, mode="two_stage")
                     break
             
             # 第一个配置结束，启动第二个配置
-            log.info(f"第一个任务已结束，正在关闭当前 BetterGI 实例...")
+            log_action("Launcher", "BetterGI", "start", method="cmdline", onedragon=True, phase="terminate_for_next")
             
             if process:
                 process.terminate()
@@ -170,13 +291,13 @@ class GameLauncher:
             # 等待一秒确保进程彻底释放
             time.sleep(1)
 
-            log.info(f"准备启动第二个配置: {config_2}")
+            log_action("Launcher", "BetterGI", "start", method="cmdline", onedragon=True, mode="two_stage", stage="second")
             # 使用统一的启动方法，优先使用命令行
             self._do_launch_bettergi(bettergi_path, True, config_2)
             
-            log.info("BetterGI 切换流程已完成，主程序即将退出")
+            log_action("Launcher", "BetterGI", "ok", method="cmdline", onedragon=True, mode="two_stage", stage="second")
         except Exception as e:
-            log.error(f"监听 BetterGI 过程出错: {e}")
+            log_action("Launcher", "BetterGI", "fail", method="cmdline", onedragon=True, mode="two_stage", reason=str(e))
         finally:
             if process and process.poll() is None:
                 process.terminate()
@@ -188,6 +309,14 @@ class GameLauncher:
             self._launcher_thread.join(timeout=timeout)
 
     def _try_launch_via_url(self, onedragon_enabled: bool, config_name: str = None) -> bool:
+        log_action(
+            "Launcher",
+            "BetterGI",
+            "start",
+            method="urlscheme",
+            onedragon=bool(onedragon_enabled),
+            has_config=bool((config_name or "").strip()),
+        )
         try:
             if onedragon_enabled:
                 url = "bettergi://startOneDragon"
@@ -197,25 +326,53 @@ class GameLauncher:
             else:
                 os.startfile("bettergi://start")
             time.sleep(5)
+            log_action(
+                "Launcher",
+                "BetterGI",
+                "ok",
+                method="urlscheme",
+                onedragon=bool(onedragon_enabled),
+                has_config=bool((config_name or "").strip()),
+            )
             return True
         except Exception as e:
-            log.warning(f"URL Scheme 启动失败: {e}")
+            log_action(
+                "Launcher",
+                "BetterGI",
+                "fail",
+                method="urlscheme",
+                onedragon=bool(onedragon_enabled),
+                has_config=bool((config_name or "").strip()),
+                reason=str(e),
+            )
             return False
 
     def _launch_genshin(self, settings):
         genshin_path = settings.get('genshin_path')
-        if genshin_path and os.path.exists(genshin_path):
-            try:
-                subprocess.Popen([genshin_path], cwd=os.path.dirname(genshin_path), close_fds=True,
-                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
-                time.sleep(5)
-            except Exception:
-                pass
+        if not genshin_path:
+            log_action("Launcher", "Genshin", "skip", reason="path_empty", method="cmdline")
+            return
+        if not os.path.exists(genshin_path):
+            log_action("Launcher", "Genshin", "skip", reason="path_not_exists", method="cmdline")
+            return
+        log_action("Launcher", "Genshin", "start", method="cmdline", file=os.path.basename(genshin_path))
+        try:
+            subprocess.Popen([genshin_path], cwd=os.path.dirname(genshin_path), close_fds=True,
+                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
+            time.sleep(5)
+            log_action("Launcher", "Genshin", "ok", method="cmdline", file=os.path.basename(genshin_path))
+        except Exception as e:
+            log_action("Launcher", "Genshin", "fail", method="cmdline", file=os.path.basename(genshin_path), reason=str(e))
+            return
 
     def _launch_external_launcher(self, settings):
         launcher_path = (settings.get("external_launcher_path") or "").strip()
-        if not launcher_path or not os.path.exists(launcher_path):
+        if not launcher_path:
+            log_action("Launcher", "external_launcher", "skip", reason="path_empty", method="cmdline")
+            return
+        if not os.path.exists(launcher_path):
+            log_action("Launcher", "external_launcher", "skip", reason="path_not_exists", method="cmdline")
             return
 
         args_str = (settings.get("external_launcher_args") or "").strip()
@@ -226,6 +383,14 @@ class GameLauncher:
             except Exception:
                 args = args_str.split()
 
+        log_action(
+            "Launcher",
+            "external_launcher",
+            "start",
+            method="cmdline",
+            file=os.path.basename(launcher_path),
+            has_args=bool(args_str),
+        )
         try:
             ext = os.path.splitext(launcher_path)[1].lower()
             cwd = os.path.dirname(launcher_path)
@@ -243,7 +408,24 @@ class GameLauncher:
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                  creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
             time.sleep(1)
-        except Exception:
+            log_action(
+                "Launcher",
+                "external_launcher",
+                "ok",
+                method="cmdline",
+                file=os.path.basename(launcher_path),
+                has_args=bool(args_str),
+            )
+        except Exception as e:
+            log_action(
+                "Launcher",
+                "external_launcher",
+                "fail",
+                method="cmdline",
+                file=os.path.basename(launcher_path),
+                has_args=bool(args_str),
+                reason=str(e),
+            )
             return
 
 game_launcher = GameLauncher()

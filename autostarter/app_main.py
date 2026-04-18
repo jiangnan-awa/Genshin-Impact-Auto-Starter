@@ -7,7 +7,8 @@ from .account_manager import account_manager
 from .mihoyo_api import mihoyo_client
 from .launcher import game_launcher
 from .loghelper import log
-from .presets import PresetManager
+from .flow_executor import run_flow
+from .flow_presets import FlowPresetManager
 
 def _collect_signin_results(accounts):
     lines = []
@@ -243,39 +244,165 @@ def _windows_toggle_popup(*, force_mod: bool, signin_only: bool, no_onedragon: b
     root.mainloop()
     return result
 
+
+def _windows_preset_select_popup(*, presets: list[dict], active_preset_id: str = "") -> str | None:
+    """
+    Windows 下弹出“选择预设”窗口（仅选择已有预设）。
+    非 Windows 或无 tkinter 时返回 None（不弹窗）。
+    """
+    if sys.platform != "win32":
+        return None
+
+    if not isinstance(presets, list) or not presets:
+        return None
+
+    _set_dpi_awareness()
+    try:
+        import tkinter as tk
+        from tkinter import ttk
+    except ModuleNotFoundError:
+        return None
+
+    # 生成 label -> id 映射；若重名则用短 id 区分显示
+    items: list[tuple[str, str]] = []
+    name_count: dict[str, int] = {}
+    for p in presets:
+        if not isinstance(p, dict):
+            continue
+        pid = str(p.get("id") or "").strip()
+        if not pid:
+            continue
+        name = str(p.get("name") or pid).strip() or pid
+        name_count[name] = name_count.get(name, 0) + 1
+        items.append((name, pid))
+
+    if not items:
+        return None
+
+    labels: list[str] = []
+    label_to_id: dict[str, str] = {}
+    for name, pid in items:
+        label = name
+        if name_count.get(name, 0) > 1:
+            label = f"{name} ({pid[:6]})"
+        # 极端情况：label 仍冲突（例如同名同前 6 位），再追加完整 id
+        if label in label_to_id:
+            label = f"{label} ({pid})"
+        labels.append(label)
+        label_to_id[label] = pid
+
+    root = tk.Tk()
+    root.withdraw()
+    win = tk.Toplevel(root)
+    win.title("选择预设")
+    win.geometry("420x190")
+    win.attributes("-topmost", True)
+
+    frame = ttk.Frame(win, padding="12")
+    frame.pack(fill=tk.BOTH, expand=True)
+
+    ttk.Label(frame, text="请选择要执行的流程预设：").pack(anchor="w", pady=(0, 8))
+
+    v_label = tk.StringVar(value="")
+    combo = ttk.Combobox(frame, textvariable=v_label, values=labels, state="readonly")
+    combo.pack(fill=tk.X, pady=(0, 8))
+
+    # 默认选中 active preset（若存在），否则选第一个
+    default_label = labels[0]
+    if active_preset_id:
+        for label, pid in label_to_id.items():
+            if pid == active_preset_id:
+                default_label = label
+                break
+    v_label.set(default_label)
+
+    result: str | None = None
+
+    def on_ok():
+        nonlocal result
+        sel = str(v_label.get() or "")
+        result = label_to_id.get(sel)
+        try:
+            win.destroy()
+            root.destroy()
+        except Exception:
+            pass
+
+    def on_cancel():
+        nonlocal result
+        result = None
+        try:
+            win.destroy()
+            root.destroy()
+        except Exception:
+            pass
+
+    btns = ttk.Frame(frame)
+    btns.pack(fill=tk.X, pady=(12, 0))
+    ttk.Button(btns, text="开 始", command=on_ok).pack(side=tk.RIGHT, padx=(6, 0))
+    ttk.Button(btns, text="取 消", command=on_cancel).pack(side=tk.RIGHT)
+
+    win.protocol("WM_DELETE_WINDOW", on_cancel)
+    root.mainloop()
+    return result
+
 def main():
     try:
         cli = _parse_cli([a for a in sys.argv[1:] if isinstance(a, str)])
         force_mod = bool(cli["force_mod"])
         signin_only = bool(cli["signin_only"])
         no_onedragon = bool(cli["no_onedragon"])
-        preset_id = cli.get("preset_id")
+        preset_id_cli = cli.get("preset_id")
+        preset_id = preset_id_cli
+        preset_from_cli = bool(preset_id_cli)
 
-        # 未传 preset：Windows 下提供一次性临时开关弹窗
+        pm_for_selected: FlowPresetManager | None = None
+
+        # 未传 preset：优先弹出“选择预设”窗口；若没有任何预设则回退旧的“临时开关”窗口
         if not preset_id:
-            overrides = _windows_toggle_popup(
-                force_mod=force_mod,
-                signin_only=signin_only,
-                no_onedragon=no_onedragon,
-            )
-            if isinstance(overrides, dict):
-                force_mod = bool(overrides.get("force_mod", force_mod))
-                signin_only = bool(overrides.get("signin_only", signin_only))
-                no_onedragon = bool(overrides.get("no_onedragon", no_onedragon))
+            try:
+                pm0 = FlowPresetManager()
+                pm0.load()
+                presets = pm0.list()
+            except Exception:
+                presets = []
+                pm0 = None  # type: ignore[assignment]
+
+            if presets:
+                chosen = _windows_preset_select_popup(
+                    presets=presets,
+                    active_preset_id=str(getattr(pm0, "data", {}).get("active_preset_id") or ""),
+                )
+                if not chosen:
+                    # 用户取消：直接退出，不继续启动
+                    sys.exit(0)
+                preset_id = str(chosen)
+                preset_from_cli = False
+                pm_for_selected = pm0
+            else:
+                overrides = _windows_toggle_popup(
+                    force_mod=force_mod,
+                    signin_only=signin_only,
+                    no_onedragon=no_onedragon,
+                )
+                if isinstance(overrides, dict):
+                    force_mod = bool(overrides.get("force_mod", force_mod))
+                    signin_only = bool(overrides.get("signin_only", signin_only))
+                    no_onedragon = bool(overrides.get("no_onedragon", no_onedragon))
         
         accounts = account_manager.get_accounts()
         settings = account_manager.get_settings()
 
-        suppress_popup = bool(preset_id)
-        preset_settings = None
+        suppress_popup = bool(preset_from_cli)
+        preset_flow = None
         if preset_id:
-            pm = PresetManager()
+            pm = pm_for_selected or FlowPresetManager()
             pm.load()
             try:
                 preset = pm.get(preset_id)
-                preset_settings = preset.get("settings") if isinstance(preset, dict) else None
-                if not isinstance(preset_settings, dict):
-                    preset_settings = {}
+                preset_flow = preset.get("flow") if isinstance(preset, dict) else None
+                if not isinstance(preset_flow, list):
+                    preset_flow = []
             except KeyError:
                 raise RuntimeError(f"未找到预设: {preset_id}")
         
@@ -310,12 +437,21 @@ def main():
         threading.Thread(target=signin_task, daemon=True).start()
         
         if not signin_only:
-            # 传入 preset 时使用预设 settings 启动，并且不弹窗
-            game_launcher.launch(
-                settings=preset_settings,
-                force_mod=force_mod,
-                no_onedragon=no_onedragon,
-            )
+            if preset_id:
+                # preset：按 flow 执行（顺序由 preset.flow 唯一决定），且不弹窗
+                run_flow(
+                    preset_flow or [],
+                    settings,
+                    force_mod=force_mod,
+                    no_onedragon=no_onedragon,
+                )
+            else:
+                # 无 preset：保留旧版“根据 settings 自动决定启动顺序”的逻辑
+                game_launcher.launch(
+                    settings=None,
+                    force_mod=force_mod,
+                    no_onedragon=no_onedragon,
+                )
         
         if skip_signin:
             # 如果跳过签到，不需要等待或显示弹窗

@@ -198,6 +198,47 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
     )
     _entry_row("一条龙配置名称", var_bettergi_onedragon_config, placeholder="例如：每日任务")
     _entry_row("第二个一条龙配置", var_bettergi_onedragon_config_2, placeholder="可选：任务结束后切换")
+
+    # 当用户填写“一条龙配置名称”时，需要 BetterGI.exe 路径才能真正执行指定配置：
+    # 否则回退 URL Scheme 会运行 BetterGI 页面“当前选中配置”，造成“配置不生效”的误解。
+    warn_label = ctk.CTkLabel(
+        master=scroll,
+        text="",
+        anchor="w",
+        justify="left",
+        wraplength=780,
+        text_color=("#b00020", "#ff6b6b"),
+    )
+    warn_label.pack(anchor="w", pady=(0, forms.ROW_GAP_Y))
+
+    def _refresh_bettergi_warning() -> None:
+        try:
+            od_enabled = bool(var_bettergi_onedragon_enabled.get())
+            config_name = str(var_bettergi_onedragon_config.get() or "").strip()
+            bettergi_path = str(var_bettergi_path.get() or "").strip()
+            # 仅当：开启一条龙 + 填了配置名 时提示
+            if not (od_enabled and config_name):
+                warn_label.configure(text="")
+                return
+            # BetterGI 路径必须有效，否则会被强制中止（不会回退 URL Scheme）
+            if not bettergi_path:
+                warn_label.configure(
+                    text="警告：已填写“一条龙配置名称”，但未设置 BetterGI.exe 路径。\n"
+                    "此时无法执行指定配置（程序将直接中止，不会回退到 URL Scheme）。"
+                )
+                return
+            warn_label.configure(text="")
+        except Exception:
+            return
+
+    # 初次刷新一次；后续跟随输入变化刷新
+    _refresh_bettergi_warning()
+    try:
+        var_bettergi_onedragon_enabled.trace_add("write", lambda *_: _refresh_bettergi_warning())
+        var_bettergi_onedragon_config.trace_add("write", lambda *_: _refresh_bettergi_warning())
+        var_bettergi_path.trace_add("write", lambda *_: _refresh_bettergi_warning())
+    except Exception:
+        pass
     ctk.CTkLabel(
         master=scroll,
         text="提示：填写第二个配置后，将在第一个任务结束后自动切换；留空则使用 BetterGI 当前选定的配置。",

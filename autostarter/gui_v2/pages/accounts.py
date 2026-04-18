@@ -42,6 +42,7 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
     from .. import bindings as b
     from ..autosave import Debouncer
     from ..widgets import forms
+    from autostarter.log_actions import log_action
 
     state = state or AppState()
 
@@ -521,14 +522,22 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
     btn_game_manual.pack(side="right", padx=(8, 0))
 
     def _auto_get_game_cookie():
+        log_action("GUIv2", "auto_get_game_cookie", "start")
+
         def worker(status_cb: Callable[[str], None]) -> str:
             status_cb("将打开引导窗口/浏览器，请按提示完成登录…")
-            return b.auto_get_game_cookie()
+            try:
+                return b.auto_get_game_cookie()
+            except Exception as e:
+                # 不记录 cookie 明文
+                log_action("GUIv2", "auto_get_game_cookie", "fail", reason=str(e))
+                raise
 
         def on_success(cookie_val: str) -> None:
             cookie_plain["game"] = cookie_val or ""
             _refresh_cookie_visibility()
             trigger_save_account()
+            log_action("GUIv2", "auto_get_game_cookie", "ok", cookie_len=len(cookie_val or ""))
             toast("已填入游戏 Cookie")
 
         _run_bg_task_with_status(title="自动获取游戏 Cookie", worker=worker, on_success=on_success)
@@ -550,12 +559,18 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
     btn_miy_manual.pack(side="right", padx=(8, 0))
 
     def _qr_get_miyoushe_cookie():
+        log_action("GUIv2", "qr_get_miyoushe_cookie", "start")
+
         def worker(status_cb: Callable[[str], None]) -> Tuple[str, Dict[str, str]]:
             # 复用 qr_login_handler，且尽量展示二维码
             from autostarter import qr_login_handler as qr
 
             status_cb("正在创建扫码会话…")
-            qr_url, app_id, ticket, device = qr.create_qr_session()
+            try:
+                qr_url, app_id, ticket, device = qr.create_qr_session()
+            except Exception as e:
+                log_action("GUIv2", "qr_get_miyoushe_cookie", "fail", reason=str(e))
+                raise
             # 先缓存 URL（默认不显示），用于图片渲染失败时兜底展示/复制
             try:
                 if hasattr(status_cb, "set_qr_url"):
@@ -579,17 +594,22 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
             def inner_stat(msg: str) -> None:
                 status_cb(msg)
 
-            uid, game_token = qr.poll_qr_login(
-                app_id=app_id,
-                ticket=ticket,
-                device=device,
-                timeout_seconds=180,
-                status_callback=inner_stat,
-            )
-            status_cb("正在换取 stoken…")
-            mid, stoken = qr.get_stoken_by_game_token(uid=uid, game_token=game_token)
-            cookie = qr.build_miyoushe_cookie(uid=uid, mid=mid, stoken=stoken)
-            return cookie, {"stuid": str(uid), "mid": str(mid), "stoken": str(stoken)}
+            try:
+                uid, game_token = qr.poll_qr_login(
+                    app_id=app_id,
+                    ticket=ticket,
+                    device=device,
+                    timeout_seconds=180,
+                    status_callback=inner_stat,
+                )
+                status_cb("正在换取 stoken…")
+                mid, stoken = qr.get_stoken_by_game_token(uid=uid, game_token=game_token)
+                cookie = qr.build_miyoushe_cookie(uid=uid, mid=mid, stoken=stoken)
+                # 结果会进入 on_success；此处不记录 cookie/stoken 明文
+                return cookie, {"stuid": str(uid), "mid": str(mid), "stoken": str(stoken)}
+            except Exception as e:
+                log_action("GUIv2", "qr_get_miyoushe_cookie", "fail", reason=str(e))
+                raise
 
         def on_success(result: Tuple[str, Dict[str, str]]) -> None:
             cookie_val, parsed = result
@@ -605,6 +625,13 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
                 pass
             _refresh_cookie_visibility()
             trigger_save_account()
+            log_action(
+                "GUIv2",
+                "qr_get_miyoushe_cookie",
+                "ok",
+                cookie_len=len(cookie_val or ""),
+                parsed_fields="stuid,mid,stoken",
+            )
             toast("已扫码获取米游社 Cookie")
 
         _run_bg_task_with_status(title="扫码获取米游社 Cookie", worker=worker, on_success=on_success, enable_qr=True)

@@ -79,7 +79,7 @@ function Install-Dependencies([string]$pythonExe, [string]$repoRoot) {
 }
 
 function Clean-Outputs([string]$repoRoot) {
-  foreach ($p in @('build', 'dist', 'release')) {
+  foreach ($p in @('build', 'dist')) {
     $full = Join-Path $repoRoot $p
     if (Test-Path $full) {
       Write-Host "Cleaning: $p"
@@ -102,46 +102,9 @@ function Run-PyInstaller([string]$pythonExe, [string]$repoRoot, [string]$specFil
   }
 }
 
-function New-ReleaseZip([string]$repoRoot, [string]$version, [string[]]$targets) {
-  Write-Host "[4/5] Creating release zip ..."
-
-  $distDir = Join-Path $repoRoot "dist"
-  if (-not (Test-Path $distDir)) { throw "dist/ not found. Build first." }
-
-  $releaseDir = Join-Path $repoRoot "release"
-  New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
-
-  $staging = Join-Path ([System.IO.Path]::GetTempPath()) ("autostarter-release-" + [System.Guid]::NewGuid().ToString("N"))
-  New-Item -ItemType Directory -Force -Path $staging | Out-Null
-
-  try {
-    foreach ($t in $targets) {
-      $srcName = if ($t -eq 'AutoStarter') { 'AutoStarter' } else { 'AutoStarterConfig' }
-      $src = Join-Path $distDir $srcName
-      if (-not (Test-Path $src)) { throw "Build output not found: $src" }
-      Copy-Item -Recurse -Force -Path $src -Destination (Join-Path $staging $srcName)
-    }
-
-    foreach ($f in @('README.md', 'LICENSE')) {
-      $srcFile = Join-Path $repoRoot $f
-      if (Test-Path $srcFile) { Copy-Item -Force -Path $srcFile -Destination (Join-Path $staging $f) }
-    }
-
-    $zipName = "AutoStarter-$version.zip"
-    $zipPath = Join-Path $releaseDir $zipName
-    if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
-
-    Compress-Archive -Path (Join-Path $staging "*") -DestinationPath $zipPath -Force
-    return $zipPath
-  } finally {
-    if (Test-Path $staging) { Remove-Item -Recurse -Force $staging }
-  }
-}
-
-function Print-Done([string]$repoRoot, [string]$zipPath) {
+function Print-Done([string]$repoRoot) {
   Write-Host "[5/5] Done"
   Write-Host "dist/: $(Join-Path $repoRoot 'dist')"
-  if ($zipPath) { Write-Host "release zip: $zipPath" }
 }
 
 # --------------------------- main ---------------------------
@@ -167,5 +130,4 @@ if ($Targets -contains 'Config') {
   Run-PyInstaller -pythonExe $pythonExe -repoRoot $repoRoot -specFile "AutoStarterConfig.spec"
 }
 
-$zip = New-ReleaseZip -repoRoot $repoRoot -version $versionResolved -targets $Targets
-Print-Done -repoRoot $repoRoot -zipPath $zip
+Print-Done -repoRoot $repoRoot

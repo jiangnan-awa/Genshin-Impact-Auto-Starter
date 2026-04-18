@@ -1,10 +1,11 @@
 import json
 import os
-import sys
 import uuid
 import configparser
 import shutil
 from .security import encrypt_cookie, decrypt_cookie
+from . import config_paths
+from .log_actions import log_action
 
 class AccountManager:
     def __init__(self):
@@ -65,15 +66,15 @@ class AccountManager:
         self._migrate_from_old_config()
 
     def _init_path(self):
-        if getattr(sys, 'frozen', False):
-            base_path = os.path.dirname(sys.executable)
-        else:
-            base_path = os.path.dirname(os.path.abspath(__file__))
+        paths = config_paths.get_config_paths()
+        # 迁移旧版根目录文件到 config/（不覆盖已有目标）
+        config_paths.migrate_root_files_to_config_dir(paths.base_path)
 
-        self.base_path = base_path
-        self.accounts_file = os.path.join(base_path, 'accounts.json')
-        self.settings_file = os.path.join(base_path, 'settings.json')
-        self.old_config_file = os.path.join(base_path, 'config.ini')
+        self.base_path = paths.base_path
+        self.accounts_file = paths.accounts_file
+        self.settings_file = paths.settings_file
+        # config.ini 仍保留在根目录（历史遗留）
+        self.old_config_file = os.path.join(paths.base_path, "config.ini")
 
     def _override_base_path_for_tests(self, base_path: str) -> None:
         """
@@ -81,15 +82,20 @@ class AccountManager:
 
         tests/test_config_migration.py 会依赖该方法。
         """
-        self.base_path = base_path
-        self.accounts_file = os.path.join(base_path, "accounts.json")
-        self.settings_file = os.path.join(base_path, "settings.json")
-        self.old_config_file = os.path.join(base_path, "config.ini")
+        paths = config_paths.get_config_paths(base_path)
+        # 测试用：允许在临时目录模拟旧版根目录文件
+        config_paths.migrate_root_files_to_config_dir(paths.base_path)
+
+        self.base_path = paths.base_path
+        self.accounts_file = paths.accounts_file
+        self.settings_file = paths.settings_file
+        self.old_config_file = os.path.join(paths.base_path, "config.ini")
 
     def load_data(self):
         """
         读取账号与全局设置。
 
+        文件位置：默认位于 base_path/config/ 下：
         - accounts.json：仅账号列表（{"accounts": [...]} 或兼容旧版 list）
         - settings.json：仅全局设置（dict）
 
@@ -166,6 +172,7 @@ class AccountManager:
         - 最后重写 accounts.json（仅账号）
         任一步失败则尽量不破坏原 accounts.json。
         """
+        log_action("AccountManager", "migrate_split_settings", "start", from_file="accounts.json", to_file="settings.json")
         # 1) 写 settings.json
         try:
             tmp_settings = self.settings_file + ".tmp"
@@ -174,6 +181,7 @@ class AccountManager:
             os.replace(tmp_settings, self.settings_file)
         except Exception:
             # 写 settings.json 失败：不继续，避免破坏原 accounts.json
+            log_action("AccountManager", "migrate_split_settings", "fail", reason="write_settings_failed")
             try:
                 if os.path.exists(tmp_settings):
                     os.remove(tmp_settings)
@@ -189,6 +197,7 @@ class AccountManager:
             shutil.copy2(self.accounts_file, backup_path)
         except Exception:
             # 备份失败：不重写 accounts.json（并尽量回滚 settings.json）
+            log_action("AccountManager", "migrate_split_settings", "fail", reason="backup_accounts_failed")
             try:
                 if os.path.exists(self.settings_file):
                     os.remove(self.settings_file)
@@ -205,29 +214,37 @@ class AccountManager:
             os.replace(tmp_accounts, self.accounts_file)
         except Exception:
             # 重写失败：保留备份与 settings.json，原 accounts.json 仍在（可能未被替换）
+            log_action("AccountManager", "migrate_split_settings", "fail", reason="rewrite_accounts_failed")
             try:
                 if os.path.exists(tmp_accounts):
                     os.remove(tmp_accounts)
             except Exception:
                 pass
             return
+        log_action("AccountManager", "migrate_split_settings", "ok", accounts_count=len(accounts_only.get("accounts") or []))
 
     def _save_accounts_file(self) -> bool:
+        log_action("AccountManager", "save_accounts", "start", count=len(self.accounts))
         try:
             os.makedirs(os.path.dirname(self.accounts_file), exist_ok=True)
             with open(self.accounts_file, "w", encoding="utf-8") as f:
                 json.dump({"accounts": self.accounts}, f, ensure_ascii=False, indent=2)
+            log_action("AccountManager", "save_accounts", "ok", count=len(self.accounts))
             return True
         except Exception:
+            log_action("AccountManager", "save_accounts", "fail", count=len(self.accounts), reason="exception")
             return False
 
     def _save_settings_file(self) -> bool:
+        log_action("AccountManager", "save_settings", "start", count=len(self.settings))
         try:
             os.makedirs(os.path.dirname(self.settings_file), exist_ok=True)
             with open(self.settings_file, "w", encoding="utf-8") as f:
                 json.dump(self.settings, f, ensure_ascii=False, indent=2)
+            log_action("AccountManager", "save_settings", "ok", count=len(self.settings))
             return True
         except Exception:
+            log_action("AccountManager", "save_settings", "fail", count=len(self.settings), reason="exception")
             return False
 
     def load_accounts(self):
@@ -351,6 +368,14 @@ class AccountManager:
         return decrypted_accounts
 
     def update_account(self, account_id, **kwargs):
+        changed_keys = sorted([str(k) for k in kwargs.keys()])
+        log_action(
+            "AccountManager",
+            "update_account",
+            "start",
+            account_id=str(account_id),
+            changed_keys=",".join(changed_keys),
+        )
         for acc in self.accounts:
             if acc['id'] == account_id:
                 sensitive_keys = ['cookie', 'game_cookie', 'miyoushe_cookie', 'stoken', 'mid', 'stuid']
@@ -367,8 +392,35 @@ class AccountManager:
                             acc[k] = ""
                     else:
                         acc[k] = v
-                self.save_accounts()
+                ok = bool(self.save_accounts())
+                if ok:
+                    log_action(
+                        "AccountManager",
+                        "update_account",
+                        "ok",
+                        account_id=str(account_id),
+                        count=len(self.accounts),
+                        changed_keys=",".join(changed_keys),
+                    )
+                else:
+                    log_action(
+                        "AccountManager",
+                        "update_account",
+                        "fail",
+                        account_id=str(account_id),
+                        count=len(self.accounts),
+                        changed_keys=",".join(changed_keys),
+                        reason="save_failed",
+                    )
                 return True
+        log_action(
+            "AccountManager",
+            "update_account",
+            "fail",
+            account_id=str(account_id),
+            changed_keys=",".join(changed_keys),
+            reason="account_not_found",
+        )
         return False
 
     def delete_account(self, account_id):
@@ -379,9 +431,34 @@ class AccountManager:
         return self.settings.copy()
 
     def update_settings(self, **kwargs):
+        changed_keys = sorted([str(k) for k in kwargs.keys()])
+        log_action(
+            "AccountManager",
+            "update_settings",
+            "start",
+            changed_keys=",".join(changed_keys),
+            count=len(kwargs),
+        )
         self.settings.update(kwargs)
         # settings.json 仅用于全局设置，避免每次改设置都重写 accounts.json
-        self._save_settings_file()
+        ok = bool(self._save_settings_file())
+        if ok:
+            log_action(
+                "AccountManager",
+                "update_settings",
+                "ok",
+                changed_keys=",".join(changed_keys),
+                count=len(kwargs),
+            )
+        else:
+            log_action(
+                "AccountManager",
+                "update_settings",
+                "fail",
+                changed_keys=",".join(changed_keys),
+                count=len(kwargs),
+                reason="save_failed",
+            )
 
     def parse_cookie(self, cookie_str):
         """从 Cookie 字符串中解析 stoken, mid, stuid 等"""
