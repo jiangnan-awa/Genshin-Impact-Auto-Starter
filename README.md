@@ -78,7 +78,7 @@
 
 ### Mod 启动模式
 
-开启「Mod 启动模式」并配置好程序路径后，启动器会运行该程序，并附加参数 `--auto-launch`。（该项只适配GIML，项目地址<https://github.com/CHN-HelloWorld/GIML）>
+开启「Mod 启动模式」并配置好程序路径后，启动器会运行该程序，并附加参数 `--auto-launch`。（该项只适配GIML，项目地址<https://github.com/CHN-HelloWorld/GIML>）
 
 ### 预设
 
