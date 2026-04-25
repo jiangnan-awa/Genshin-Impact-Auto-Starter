@@ -1,19 +1,11 @@
-# 米游社的Salt
-# java提取，会跟随版本更新
 mihoyobbs_salt = "b0EofkfMKq2saWV9fwux18J5vzcFTlex"
 mihoyobbs_salt_web = "DlOUwIupfU6YespEUWDJmXtutuXV6owG"
-# so提取 一般不会变
 mihoyobbs_salt_x4 = "xV8v4Qu54lUKrEYFZkJhB8cuOh9Asafs"
 mihoyobbs_salt_x6 = "t0qEgfub6cvueAPgR5m9aQWWVciEer7v"
-# 部分接口要带
 mihoyobbs_verify_key = "bll8iq97cem8"
-# 米游社的版本
 mihoyobbs_version = "2.99.1"  # Salt和Version相互对应
-# 米游社的客户端类型
 mihoyobbs_Client_type = "2"  # 1为ios 2为安卓
 mihoyobbs_Client_type_web = "5"  # 4为pc web 5为mobile web
-
-# 米游社的分区列表
 mihoyobbs_List = {
     1: {"id": "1", "forumId": "1", "name": "崩坏3"},
     2: {"id": "2", "forumId": "26", "name": "原神"},
@@ -25,7 +17,6 @@ mihoyobbs_List = {
     9: {"id": "9", "forumId": "948", "name": "崩坏：因缘精灵"},
     10: {"id": "10", "forumId": "950", "name": "星布谷地"},
 }
-
 game_id2name = {
     "bh2_cn": "崩坏2",
     "bh3_cn": "崩坏3",
@@ -35,7 +26,6 @@ game_id2name = {
     "nap_cn": "绝区零",
     "abc_cn": "崩坏：因缘精灵",
 }
-
 game_id2config = {
     "bh2_cn": "honkai2",
     "bh3_cn": "honkai3rd",
@@ -45,8 +35,6 @@ game_id2config = {
     "nap_cn": "zzz",
     "abc_cn": "hna",
 }
-
-# 游戏签到的请求头
 headers = {
     'Accept': 'application/json, text/plain, */*',
     'DS': "",
@@ -63,16 +51,11 @@ headers = {
     "Cookie": "",
     'x-rpc-device_id': ""
 }
-
-# 通用设置
 bbs_api = "https://bbs-api.miyoushe.com"
 web_api = "https://api-takumi.mihoyo.com"
 passport_api = "https://passport-api.mihoyo.com"
-
 account_Info_url = web_api + "/binding/api/getUserGameRolesByCookie"
 get_token_by_stoken = f"{passport_api}/account/ma-cn-session/app/getTokenBySToken"
-
-# 米游社的API列表
 bbs_account_info = "https://webapi.account.mihoyo.com/Api/cookie_accountinfo_by_loginticket"
 bbs_get_multi_token_by_login_ticket = f"{web_api}/auth/api/getMultiTokenByLoginTicket"
 bbs_get_cookie_token_by_stoken = f"{web_api}/auth/api/getCookieAccountInfoBySToken"
@@ -84,13 +67,10 @@ bbs_share_url = f"{bbs_api}/apihub/api/getShareConf"
 bbs_like_url = f"{bbs_api}/apihub/sapi/upvotePost"
 bbs_get_captcha = f"{bbs_api}/misc/api/createVerification?is_high=true"
 bbs_captcha_verify = f"{bbs_api}/misc/api/verifyVerification"
-
-# 通用游戏签到API和设置
 cn_game_lang = "zh-cn"
 cn_game_checkin_rewards = f"{web_api}/event/luna/home?lang={cn_game_lang}"
 cn_game_is_signurl = f"{web_api}/event/luna/info?lang={cn_game_lang}"
 cn_game_sign_url = f"{web_api}/event/luna/sign"
-
 hk4e_api_base_url = 'https://hk4e-api.mihoyo.com'
 hk4e_token_get_info_url = f'{web_api}/common/badge/v1/login/info'
 get_hk4e_token_url = f'{web_api}/common/badge/v1/login/account'
@@ -98,32 +78,25 @@ genius_invokation_status = f'{hk4e_api_base_url}/event/geniusinvokationtcg/rd_in
 genius_invokation_task_url = f'{hk4e_api_base_url}/event/geniusinvokationtcg/adventure_task_list'
 genius_invokation_get_award_url = f'{hk4e_api_base_url}/event/geniusinvokationtcg/award_adventure_task'
 genius_invokation_finish_task_url = f'{hk4e_api_base_url}/event/geniusinvokationtcg/finish_adventure_task'
-
 honkai2_act_id = "e202203291431091"
 honkai3rd_act_id = "e202306201626331"
 tearsofthemis_act_id = "e202202251749321"
 genshin_act_id = "e202311201442471"
 honkai_sr_act_id = "e202304121516551"
-
 zzz_web_api = 'https://act-nap-api.mihoyo.com'
 zzz_game_checkin_rewards = f"{zzz_web_api}/event/luna/zzz/home?lang={cn_game_lang}"
 zzz_game_is_signurl = f"{zzz_web_api}/event/luna/zzz/info?lang={cn_game_lang}"
 zzz_game_sign_url = f"{zzz_web_api}/event/luna/zzz/sign"
 zzz_act_id = "e202406242138391"
-
 cloud_genshin_api = "https://api-cloudgame.mihoyo.com"
 cloud_genshin_sgin = f"{cloud_genshin_api}/hk4e_cg_cn/wallet/wallet/get"
-
 cloud_zzz_api = "https://cg-nap-api.mihoyo.com"
 cloud_zzz_sgin = f"{cloud_zzz_api}/nap_cn/cg/wallet/wallet/get"
-
 os_referer_url = "https://act.hoyolab.com/"
 os_genshin_act_id = "e202102251931481"
 os_honkai_sr_act_id = "e202303301540311"
 os_honkai3rd_act_id = "e202110291205111"
 os_tearsofthemis_act_id = "e202202281857121"
 os_zzz_act_id = "e202406031448091"
-
 cloud_genshin_api_os = "https://sg-cg-api.hoyoverse.com"
 cloud_genshin_sgin_os = f"{cloud_genshin_api_os}/hk4e_global/cg/wallet/wallet/get"
-

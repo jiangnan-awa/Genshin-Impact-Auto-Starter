@@ -40,16 +40,13 @@ python gui.py
 
 | 参数 | 说明 |
 |------|------|
-| `--signin-only` / `-s` | 仅签到 |
-| `--mod` / `--mod-mode` | 临时启用 Mod 启动模式 |
-| `--no-onedragon` / `--skip-onedragon` | 跳过一条龙任务 |
 | `--preset <id>` | 使用指定流程预设 |
 
 示例：
 ```powershell
-python main.py --signin-only
-python -m autostarter --mod-mode
 python main.py --preset <id>
+
+说明：当前版本主程序仅支持通过 `--preset <id>` 启动；未提供该参数会直接退出并提示用法。
 ```
 
 ## 调试配置（VS Code）
@@ -67,7 +64,7 @@ python main.py --preset <id>
 - `gui.py` - 配置界面入口
 - `autostarter/` - 核心包
   - `app_main.py` - 主流程和命令行解析
-  - `gui_v2/` - 配置界面 GUI
+  - `gui/` - 配置界面 GUI
   - `account_manager.py` - 账号管理
   - `mihoyo_api.py` - 米游社 API
   - `qr_login_handler.py` - 扫码登录

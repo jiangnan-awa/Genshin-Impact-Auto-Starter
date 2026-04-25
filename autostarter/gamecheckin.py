@@ -1,6 +1,5 @@
 import time
 import random
-
 from . import login
 from . import tools
 from . import config
@@ -10,10 +9,7 @@ from .error import *
 from .request import get_new_session
 from .loghelper import log
 from .account import get_account_list
-
-
 class GameCheckin:
-
     def __init__(self, game_id: str, game_mid: str, game_name: str, act_id: str, player_name: str = "玩家") -> None:
         self.game_id = game_id
         self.game_mid = game_mid
@@ -22,20 +18,15 @@ class GameCheckin:
         self.player_name = player_name
         self.headers = {}
         self.http = get_new_session()
-
         self.set_headers()
-
         self.rewards_api = setting.cn_game_checkin_rewards
         self.account_list = self.get_account_list()
         self.is_sign_api = setting.cn_game_is_signurl
-
         self.sign_api = setting.cn_game_sign_url
         self.checkin_rewards = []
-
     def init(self):
         if len(self.account_list) != 0:
             self.checkin_rewards = self.get_checkin_rewards()
-
     def set_headers(self):
         headers = setting.headers.copy()
         headers['DS'] = tools.get_ds(web=True)
@@ -44,7 +35,6 @@ class GameCheckin:
         headers['x-rpc-device_id'] = config.config["device"]["id"]
         headers['User-Agent'] = tools.get_useragent(config.config["games"]["cn"]["useragent"])
         self.headers = headers
-
     def get_account_list(self) -> list:
         try:
             account_list = get_account_list(self.game_id, self.headers)
@@ -54,7 +44,6 @@ class GameCheckin:
             config.disable_games()
             raise CookieError("Cookie Error")
         return account_list
-
     def get_checkin_rewards(self) -> list:
         log.info("正在获取签到奖励列表...")
         max_retry = 3
@@ -67,7 +56,6 @@ class GameCheckin:
             time.sleep(5)
         log.warning("获取签到奖励列表失败")
         return []
-
     def is_sign(self, region: str, uid: str, update: bool = False) -> dict:
         req = self.http.get(self.is_sign_api, params={"act_id": self.act_id, "region": region, "uid": uid},
                             headers=self.headers)
@@ -82,7 +70,6 @@ class GameCheckin:
             config.save_config()
             raise CookieError("BBS Cookie Errror")
         return data["data"]
-
     def check_in(self, account):
         header = self.headers.copy()
         retries = config.config['games']['cn'].get('retries', 3)
@@ -115,7 +102,6 @@ class GameCheckin:
             else:
                 break
         return result
-
     def sign_account(self) -> str:
         return_data = f"{self.game_name}: "
         if not self.account_list:
@@ -167,8 +153,6 @@ class GameCheckin:
             return_data += f"\n{account[0]}已连续签到{sign_days}天\n" \
                            f"今天获得的奖励是{tools.get_item(self.checkin_rewards[sign_days - 1])}"
         return return_data
-
-
 class Honkai2(GameCheckin):
     def __init__(self) -> None:
         super().__init__("bh2_cn", "honkai2", "崩坏学园2", setting.honkai2_act_id)
@@ -176,8 +160,6 @@ class Honkai2(GameCheckin):
                                   f'=true&act_id={setting.honkai2_act_id}&bbs_presentation_style=fullscreen' \
                                   '&utm_source=bbs&utm_medium=mys&utm_campaign=icon'
         self.init()
-
-
 class Honkai3rd(GameCheckin):
     def __init__(self) -> None:
         super().__init__("bh3_cn", "honkai3rd", "崩坏3", setting.honkai3rd_act_id, "舰长")
@@ -185,8 +167,6 @@ class Honkai3rd(GameCheckin):
                                   f'=true&act_id={setting.honkai3rd_act_id}&bbs_presentation_style=fullscreen' \
                                   '&utm_source=bbs&utm_medium=mys&utm_campaign=icon'
         self.init()
-
-
 class TearsOfThemis(GameCheckin):
     def __init__(self) -> None:
         super().__init__("nxx_cn", "tears_of_themis", "未定事件簿", setting.tearsofthemis_act_id, "律师")
@@ -194,23 +174,17 @@ class TearsOfThemis(GameCheckin):
                                   '=true&bbs_presentation_style=fullscreen' \
                                   f'act_id={setting.tearsofthemis_act_id}'
         self.init()
-
-
 class Genshin(GameCheckin):
     def __init__(self) -> None:
         super().__init__("hk4e_cn", "genshin", "原神", setting.genshin_act_id, "旅行者")
         self.headers["Origin"] = "https://act.mihoyo.com"
         self.headers["x-rpc-signgame"] = "hk4e"
         self.init()
-
-
 class Honkaisr(GameCheckin):
     def __init__(self):
         super().__init__("hkrpg_cn", "honkai_sr", "崩坏：星穹铁道", setting.honkai_sr_act_id, "开拓者")
         self.headers["Origin"] = "https://act.mihoyo.com"
         self.init()
-
-
 class ZZZ(GameCheckin):
     def __init__(self):
         super().__init__("nap_cn", "zzz", "绝区零", setting.zzz_act_id, "绳匠")
@@ -220,8 +194,6 @@ class ZZZ(GameCheckin):
         self.is_sign_api = setting.zzz_game_is_signurl
         self.sign_api = setting.zzz_game_sign_url
         self.init()
-
-
 def checkin_game(game_name, game_module, game_print_name=""):
     game_config = config.config["games"]["cn"][game_name]
     if game_config["checkin"]:
@@ -232,8 +204,6 @@ def checkin_game(game_name, game_module, game_print_name=""):
         return_data = f"\n\n{game_module().sign_account()}"
         return return_data
     return ''
-
-
 def run_task():
     games = [
         ("崩坏学园2", "honkai2", Honkai2),
@@ -244,8 +214,6 @@ def run_task():
         ("绝区零", "zzz", ZZZ)
     ]
     return run_task_selected([g[1] for g in games])
-
-
 def run_task_selected(game_mids):
     if not game_mids:
         return ""

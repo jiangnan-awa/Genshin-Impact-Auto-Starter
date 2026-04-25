@@ -7,28 +7,20 @@ from copy import deepcopy
 from io import StringIO
 from string import ascii_letters, digits
 from typing import Callable, Optional, Tuple
-
-
 APP_VERSION = "2.71.1"
 DEVICE_NAME = "Xiaomi MI 6"
 DEVICE_MODEL = "MI 6"
 SALT_6X = "t0qEgfub6cvueAPgR5m9aQWWVciEer7v"
-
 TOKEN_BY_GAME_TOKEN_URL = "https://api-takumi.mihoyo.com/account/ma-cn-session/app/getTokenByGameToken"
 CHECK_QR_URL = "https://hk4e-sdk.mihoyo.com/hk4e_cn/combo/panda/qrcode/query"
 QR_URL = "https://hk4e-sdk.mihoyo.com/hk4e_cn/combo/panda/qrcode/fetch"
-
-
 def _get_ds2(query: str = "", body: str = "") -> str:
     t = str(int(time.time()))
     r = str(random.randint(100001, 200000))
     c = hashlib.md5(f"salt={SALT_6X}&t={t}&r={r}&b={body}&q={query}".encode()).hexdigest()
     return f"{t},{r},{c}"
-
-
 def create_qr_session(timeout: float = 10.0) -> Tuple[str, str, str, str]:
     import httpx
-
     app_id = "2"
     device = "".join(random.choices((ascii_letters + digits), k=64))
     payload = {"app_id": app_id, "device": device}
@@ -39,11 +31,8 @@ def create_qr_session(timeout: float = 10.0) -> Tuple[str, str, str, str]:
     qr_url: str = data["url"]
     ticket = qr_url.split("ticket=", 1)[1]
     return qr_url, app_id, ticket, device
-
-
 def build_qr_image_and_ascii(qr_url: str):
     from qrcode.main import QRCode
-
     qr = QRCode()
     qr.add_data(qr_url)
     image = qr.make_image()
@@ -51,8 +40,6 @@ def build_qr_image_and_ascii(qr_url: str):
     qr.print_ascii(out=buf)
     buf.seek(0)
     return image, buf.read()
-
-
 def poll_qr_login(
     app_id: str,
     ticket: str,
@@ -61,7 +48,6 @@ def poll_qr_login(
     status_callback: Optional[Callable[[str], None]] = None,
 ) -> Tuple[str, str]:
     import httpx
-
     deadline = time.time() + max(1, int(timeout_seconds))
     with httpx.Client(timeout=10.0) as client:
         while True:
@@ -88,11 +74,8 @@ def poll_qr_login(
             else:
                 raise RuntimeError(f"未知状态: {stat}")
             time.sleep(1)
-
-
 def get_stoken_by_game_token(uid: str, game_token: str, timeout: float = 10.0) -> Tuple[str, str]:
     import httpx
-
     headers = {
         "x-rpc-app_version": APP_VERSION,
         "DS": None,
@@ -117,8 +100,6 @@ def get_stoken_by_game_token(uid: str, game_token: str, timeout: float = 10.0) -
     mid = str(data["user_info"]["mid"])
     stoken = str(data["token"]["token"])
     return mid, stoken
-
-
 def build_miyoushe_cookie(uid: str, mid: str, stoken: str) -> str:
     uid = str(uid).strip()
     mid = str(mid).strip()

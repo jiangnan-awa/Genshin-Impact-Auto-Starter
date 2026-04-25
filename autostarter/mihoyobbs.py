@@ -2,7 +2,6 @@ import json
 import random
 import time
 from copy import deepcopy
-
 from . import captcha
 from . import config
 from . import login
@@ -11,12 +10,8 @@ from . import tools
 from .error import StokenError
 from .loghelper import log
 from .request import http
-
-
 def wait():
     time.sleep(random.randint(3, 8))
-
-
 class Mihoyobbs:
     def __init__(self):
         self.today_get_coins = 0
@@ -72,13 +67,10 @@ class Mihoyobbs:
             pass
         else:
             self.postsList = self.get_list()
-
     def refresh_list(self) -> None:
         self.postsList = self.get_list()
-
     def get_max_req_post_num(self):
         return max(self.task_do['read_num'], self.task_do['like_num'])
-
     def get_pass_challenge(self):
         req = http.get(url=setting.bbs_get_captcha, headers=self.headers)
         data = req.json()
@@ -92,7 +84,6 @@ class Mihoyobbs:
                 challenge = captcha_result["challenge"]
             else:
                 validate = captcha_result
-
             check_req = http.post(url=setting.bbs_captcha_verify, headers=self.headers,
                                   json={"geetest_challenge": challenge,
                                         "geetest_seccode": validate + "|jordan",
@@ -101,7 +92,6 @@ class Mihoyobbs:
             if check["retcode"] == 0:
                 return check["data"]["challenge"]
         return None
-
     def get_tasks_list(self, update=False):
         log.info("正在获取任务列表")
         req = http.get(url=setting.bbs_tasks_list, params={"point_sn": "myb"}, headers=self.task_header)
@@ -146,7 +136,6 @@ class Mihoyobbs:
                 new_day = data['data']['states'][0]['mission_id'] >= 62
                 log.info(f"{'新的一天，今天可以获得' if new_day else '似乎还有任务没完成，今天还能获得'}"
                          f" {self.today_get_coins} 个米游币")
-
     def get_list(self) -> list:
         choice_post_list = []
         log.info("正在获取帖子列表......")
@@ -163,7 +152,6 @@ class Mihoyobbs:
                 choice_post_list.append([post["post"]["post_id"], post["post"]["subject"]])
         log.info(f"已获取 {len(choice_post_list)} 个帖子")
         return choice_post_list
-
     def signing(self):
         if self.task_do["sign"]:
             log.info("讨论区任务已经完成过了~")
@@ -197,14 +185,12 @@ class Mihoyobbs:
                     log.error(f'未知错误：{req.text}')
             if challenge is not None:
                 header.pop("x-rpc-challenge")
-
     def read_posts(self, post_info):
         req = http.get(url=setting.bbs_detail_url, params={"post_id": post_info[0]}, headers=self.headers)
         log.debug(req.text)
         data = req.json()
         if data["message"] == "OK":
             log.debug(f"看帖：{post_info[1]} 成功")
-
     def like_posts(self, post_info, captcha_try: bool = False):
         header = deepcopy(self.headers)
         if captcha_try:
@@ -231,7 +217,6 @@ class Mihoyobbs:
         else:
             log.error(f"点赞失败：{req.text}")
         return False
-
     def cancel_like_post(self, post_info):
         req = http.post(url=setting.bbs_like_url, headers=self.headers,
                         json={"post_id": post_info[0], "is_cancel": True})
@@ -239,7 +224,6 @@ class Mihoyobbs:
             log.debug("取消点赞：{} 成功".format(post_info[1]))
             return True
         return False
-
     def share_post(self, post_info):
         for i in range(3):
             req = http.get(url=setting.bbs_share_url, params={"entity_id": post_info[0], "entity_type": 1},
@@ -251,7 +235,6 @@ class Mihoyobbs:
                 break
             log.debug(f"分享任务执行失败，正在执行第 {i + 2} 次，共 3 次")
             wait()
-
     def post_task(self):
         log.info("正在执行帖子相关任务（看帖/点赞/分享）......")
         if self.task_do["read"] and self.task_do["like"] and self.task_do["share"]:
@@ -270,7 +253,6 @@ class Mihoyobbs:
                 self.share_post(post)
                 self.task_do["share"] = True
                 wait()
-
     def run_task(self):
         return_data = "米游社: "
         if self.task_do["sign"] and self.task_do["read"] and self.task_do["like"] and \

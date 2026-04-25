@@ -4,6 +4,8 @@
 /accounts.json
 /settings.json
 /accounts.json.bak
+/config/
+/logs/
 /build
 /chromedriver.exe
 /dist

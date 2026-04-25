@@ -2,14 +2,9 @@ import collections
 import os
 import yaml
 from copy import deepcopy
-
 from .loghelper import log
-
-# 这个字段现在还没找好塞什么地方好，就先塞config这里了
 serverless = False
-# 提示需要更新config版本
 update_config_need = False
-
 config = {
     'enable': True, 'version': 15, "push": "",
     'account': {'cookie': '', 'stuid': '', 'stoken': '', 'mid': ''},
@@ -58,7 +53,6 @@ config = {
     'web_activity': {'enable': False, 'activities': []}
 }
 config_raw = deepcopy(config)
-
 path = os.path.dirname(os.path.realpath(__file__)) + "/config"
 if os.getenv("AutoMihoyoBBS_config_path") is not None:
     path = os.getenv("AutoMihoyoBBS_config_path")
@@ -66,12 +60,8 @@ config_prefix = os.getenv("AutoMihoyoBBS_config_prefix")
 if config_prefix is None:
     config_prefix = ""
 config_Path = f"{path}/{config_prefix}config.yaml"
-
-
 def copy_config():
     return deepcopy(config_raw)
-
-
 def config_v11_update(data: dict):
     global update_config_need
     update_config_need = True
@@ -89,8 +79,6 @@ def config_v11_update(data: dict):
     new_config['cloud_games']['cn']['genshin']['token'] = data['cloud_games']['genshin']['token']
     log.info("config 已升级到：13")
     return new_config
-
-
 def config_v12_update(data: dict):
     global update_config_need
     update_config_need = True
@@ -98,20 +86,14 @@ def config_v12_update(data: dict):
     data['cloud_games']['cn']['zzz'] = {'enable': False, 'token': ""}
     log.info("config 已升级到: 13")
     return data
-
-
 def config_v13_update(data: dict):
     global update_config_need
     update_config_need = True
     new_config = deepcopy(data)
-
     new_config['version'] = 14
     new_config['device']['fp'] = config['device'].get('fp', '')
-
     log.info("config 已升级到：14")
     return new_config
-
-
 def update_v14_update(data: dict):
     global update_config_need
     update_config_need = True
@@ -120,8 +102,6 @@ def update_v14_update(data: dict):
     new_config['web_activity'] = {'enable': False, 'activities': []}
     log.info("config 已升级到：15")
     return new_config
-
-
 def load_config(p_path=None):
     global config
     if not p_path:
@@ -142,8 +122,6 @@ def load_config(p_path=None):
     config = data
     log.info("Config 加载完毕")
     return data
-
-
 def save_config(p_path=None, p_config=None):
     global serverless
     if serverless:
@@ -164,8 +142,6 @@ def save_config(p_path=None, p_config=None):
             log.info("Cookie 保存失败")
         else:
             log.info("Config 保存完毕")
-
-
 def clear_stoken():
     global config
     if serverless:
@@ -176,8 +152,6 @@ def clear_stoken():
     config["account"]["stoken"] = "StokenError"
     log.info("Stoken 已删除")
     save_config()
-
-
 def clear_cookie():
     global config
     if serverless:
@@ -186,8 +160,6 @@ def clear_cookie():
     config["account"]["cookie"] = "CookieError"
     log.info(f"Cookie 已删除")
     save_config()
-
-
 def disable_games(region: str = "cn"):
     global config
     if serverless:
@@ -196,8 +168,6 @@ def disable_games(region: str = "cn"):
     config['games'][region]['enable'] = False
     log.info(f"游戏签到（{region}）已关闭")
     save_config()
-
-
 def clear_cookie_cloudgame_genshin():
     global config
     if serverless:
@@ -207,8 +177,6 @@ def clear_cookie_cloudgame_genshin():
     config['cloud_games']['cn']['genshin']['token'] = ""
     log.info("国服云原神 Cookie 删除完毕")
     save_config()
-
-
 def clear_cookie_cloudgame_genshin_os():
     global config
     if serverless:
@@ -218,8 +186,6 @@ def clear_cookie_cloudgame_genshin_os():
     config['cloud_games']['os']['genshin']['token'] = ""
     log.info("国际服云原神 Cookie 删除完毕")
     save_config()
-
-
 def clear_cookie_cloudgame_zzz():
     global config
     if serverless:
@@ -229,7 +195,5 @@ def clear_cookie_cloudgame_zzz():
     config['cloud_games']['cn']['zzz']['token'] = ""
     log.info("国服云绝区零 Cookie 删除完毕")
     save_config()
-
-
 if __name__ == "__main__":
     pass

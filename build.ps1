@@ -74,7 +74,7 @@ function Install-Dependencies([string]$pythonExe, [string]$repoRoot) {
     Write-Warning "requirements.txt not found; skip."
   }
 
-  # Extra deps for packaging / GUI v2
+  # Extra deps for packaging / GUI
   & $pythonExe -m pip install -U pyinstaller customtkinter
 }
 

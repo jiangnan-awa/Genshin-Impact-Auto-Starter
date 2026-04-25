@@ -1,18 +1,14 @@
 import re
 from copy import deepcopy
-
 from . import config
 from . import setting
 from .error import CookieError, StokenError
 from .loghelper import log
 from .request import http
-
 headers = setting.headers.copy()
 headers.pop("DS")
 headers.pop("Origin")
 headers.pop("Referer")
-
-
 def login():
     if not config.config["account"]["cookie"]:
         log.error("请填入 Cookies！")
@@ -32,18 +28,12 @@ def login():
     log.info("登录成功！")
     log.info("正在保存 Config！")
     config.save_config()
-
-
 def get_login_ticket() -> str:
     ticket_match = re.search(r'login_ticket=(.*?)(?:;|$)', config.config["account"]["cookie"])
     return ticket_match.group(1) if ticket_match else None
-
-
 def get_mid() -> str:
     mid = re.search(r'(account_mid_v2|ltmid_v2|mid)=(.*?)(?:;|$)', config.config["account"]["cookie"])
     return mid.group(2) if mid else None
-
-
 def get_uid():
     uid = None
     uid_match = re.search(r"(account_id|ltuid|login_uid|ltuid_v2|account_id_v2)=(\d+)",
@@ -52,8 +42,6 @@ def get_uid():
         return uid
     uid = uid_match.group(2)
     return uid
-
-
 def get_stoken(login_ticket: str, uid: str) -> str:
     data = http.get(url=setting.bbs_get_multi_token_by_login_ticket,
                     params={"login_ticket": login_ticket, "token_types": "3", "uid": uid},
@@ -64,8 +52,6 @@ def get_stoken(login_ticket: str, uid: str) -> str:
         log.error("login_ticket（只有半小时有效期）已失效,请重新登录米游社抓取 cookie")
         config.clear_cookie()
         raise CookieError('Cookie expires')
-
-
 def get_cookie_token_by_stoken():
     if config.config["account"]["stoken"] == "" and config.config["account"]["stuid"] == "":
         log.error("Stoken 和 Suid 为空，无法自动更新 CookieToken")
@@ -80,8 +66,6 @@ def get_cookie_token_by_stoken():
         config.clear_stoken()
         raise StokenError('Stoken expires')
     return data["data"]["cookie_token"]
-
-
 def update_cookie_token() -> bool:
     log.info("CookieToken 失效，尝试刷新")
     old_token_match = re.search(r'cookie_token=(.*?)(?:;|$)', config.config["account"]["cookie"])
@@ -93,14 +77,10 @@ def update_cookie_token() -> bool:
         config.save_config()
         return True
     return False
-
-
 def require_mid() -> bool:
     if config.config["account"]["stoken"].startswith("v2_"):
         return True
     return False
-
-
 def get_stoken_cookie() -> str:
     cookie = f"stuid={config.config['account']['stuid']};stoken={config.config['account']['stoken']}"
     if require_mid():
