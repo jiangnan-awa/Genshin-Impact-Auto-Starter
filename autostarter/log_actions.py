@@ -21,11 +21,14 @@ _STATUS_ZH = {
 }
 _KEY_ZH = {
     "reason": "原因",
-    "count": "数量",
     "file": "文件",
     "from_file": "源文件",
     "to_file": "目标文件",
-    "steps_count": "步骤数",
+    "accounts_count": "账号数",
+    "settings_keys_count": "设置项数",
+    "changed_keys_count": "修改项数",
+    "preset_steps_count": "预设步骤数",
+    "total_steps_count": "总步骤数",
     "presets_count": "预设数",
     "seconds": "秒数",
     "preset_id": "预设ID",

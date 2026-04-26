@@ -19,6 +19,13 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
         maybe = state.data.get("toast") or state.data.get("toast_cb") or state.data.get("toast_callback")
         if callable(maybe):
             toast_cb = maybe  # type: ignore[assignment]
+    notify_cb: Optional[Callable[..., None]] = None
+    NotifyRequest = None
+    if isinstance(getattr(state, "data", None), dict):
+        maybe2 = state.data.get("notify")
+        if callable(maybe2):
+            notify_cb = maybe2
+        NotifyRequest = state.data.get("NotifyRequest")
     def toast(msg: str) -> None:
         if toast_cb is None:
             return
@@ -26,6 +33,15 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
             toast_cb(msg)
         except Exception:
             return
+    def notify(level: str, title: str, message: str, *, kind: str, toast_ms: int = 2200, debug_only_modal: bool = False) -> None:
+        if notify_cb is None or NotifyRequest is None:
+            toast(message)
+            return
+        try:
+            req = NotifyRequest(level=level, title=title, message=message, kind=kind, toast_ms=int(toast_ms), debug_only_modal=bool(debug_only_modal))
+            notify_cb(req)
+        except Exception:
+            toast(message)
     settings: Dict[str, Any] = {}
     try:
         settings = b.load_settings()
@@ -64,7 +80,7 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
             b.update_settings(**payload)
             toast("已自动保存签到设置")
         except Exception as e:  # pragma: no cover
-            toast(f"保存失败：{e}")
+            notify("error", "保存失败", f"保存失败：{e}", kind="save_failed", toast_ms=2400, debug_only_modal=True)
     deb_save = Debouncer(0.6, _save_now)
     def trigger_save() -> None:
         if is_suspended():

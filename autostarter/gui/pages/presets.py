@@ -10,8 +10,6 @@ def _import_customtkinter():
 def build_page(parent: object, state: Optional[AppState] = None) -> object:
     ctk = _import_customtkinter()
     import os
-    import re
-    import subprocess
     import sys
     import threading
     import time
@@ -29,6 +27,13 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
         maybe = state.data.get("toast") or state.data.get("toast_cb") or state.data.get("toast_callback")
         if callable(maybe):
             toast_cb = maybe  # type: ignore[assignment]
+    notify_cb: Optional[Callable[..., None]] = None
+    NotifyRequest = None
+    if isinstance(getattr(state, "data", None), dict):
+        maybe2 = state.data.get("notify")
+        if callable(maybe2):
+            notify_cb = maybe2  # type: ignore[assignment]
+        NotifyRequest = state.data.get("NotifyRequest")
     def toast(msg: str, ms: int = 1800) -> None:
         if toast_cb is None:
             return
@@ -41,6 +46,15 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
                 return
         except Exception:
             return
+    def notify(level: str, title: str, message: str, *, kind: str, toast_ms: int = 2200, debug_only_modal: bool = False) -> None:
+        if notify_cb is None or NotifyRequest is None:
+            toast(message, toast_ms)
+            return
+        try:
+            req = NotifyRequest(level=level, title=title, message=message, kind=kind, toast_ms=int(toast_ms), debug_only_modal=bool(debug_only_modal))
+            notify_cb(req)
+        except Exception:
+            toast(message, toast_ms)
     pm = FlowPresetManager()
     try:
         pm.load()
@@ -66,13 +80,6 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
             return None
     def is_shortcut_available() -> bool:
         return bool(sys.platform == "win32" and getattr(sys, "frozen", False))
-    def sanitize_filename(name: str) -> str:
-        s = (name or "").strip()
-        s = re.sub(r'[<>:"/\\\\|?*\x00-\x1f]', "", s)
-        s = s.rstrip(" .")
-        return s or "Preset"
-    def _ps_single_quote(val: str) -> str:
-        return "'" + (val or "").replace("'", "''") + "'"
     STEP_LABELS: Dict[str, str] = {
         "signin": "签到",
         "external_launcher": "外置启动器",
@@ -115,7 +122,8 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
             pm.save()
             return True
         except Exception as e:
-            toast(f"保存预设失败：{e}", 2200)
+            log_action("GUI", "save", "fail", page="presets", reason=str(e))
+            notify("error", "保存失败", f"保存预设失败：{e}", kind="save_failed", toast_ms=2200, debug_only_modal=True)
             return False
     selected_preset_id_var = tk.StringVar(value=_get_current_preset_id())
     preset_label_to_id: Dict[str, str] = {}
@@ -161,7 +169,8 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
             if _safe_save():
                 toast("已保存流程")
         except Exception as e:
-            toast(f"保存流程失败：{e}", 2400)
+            log_action("GUI", "save", "fail", page="presets", reason=str(e))
+            notify("error", "保存失败", f"保存流程失败：{e}", kind="save_failed", toast_ms=2400, debug_only_modal=True)
     def _refresh_flow_list() -> None:
         content = getattr(scroll, "_scrollable_frame", scroll)
         try:
@@ -350,7 +359,7 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
         name = str(p.get("name") or pid)
         if not is_shortcut_available():
             log_action("GUI", "create_shortcut", "skip", preset_id=pid, reason="not_available")
-            toast("仅 Windows 打包版支持生成桌面快捷方式", 2200)
+            notify("warn", "提示", "仅 Windows 打包版支持生成桌面快捷方式", kind="feature_unavailable", toast_ms=2200, debug_only_modal=False)
             return
         from autostarter.shortcut_utils import build_shortcut_basename, resolve_autostarter_target_exe
         base_path = os.path.dirname(sys.executable)
@@ -363,7 +372,7 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
         )
         flow = p.get("flow") if isinstance(p, dict) else None
         steps = flow if isinstance(flow, list) else []
-        log_action("GUI", "create_shortcut", "start", preset_id=pid, steps_count=len(steps))
+        log_action("GUI", "create_shortcut", "start", preset_id=pid, preset_steps_count=len(steps))
         def _worker() -> None:
             try:
                 from autostarter.shortcut_utils import (
@@ -420,7 +429,8 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
         pid = str(selected_preset_id_var.get() or "")
         p = _get_preset(pid)
         if not pid or not p:
-            toast("请先新建或选择一个预设")
+            log_action("GUI", "guard", "skip", page="presets", reason="no_preset")
+            notify("warn", "提示", "请先新建或选择一个预设", kind="action_required", toast_ms=2200, debug_only_modal=False)
             return
         try:
             flow = p.get("flow")
@@ -474,7 +484,8 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
         pid = str(selected_preset_id_var.get() or "")
         p = _get_preset(pid)
         if not pid or not p:
-            toast("请先新建或选择一个预设")
+            log_action("GUI", "guard", "skip", page="presets", reason="no_preset")
+            notify("warn", "提示", "请先新建或选择一个预设", kind="action_required", toast_ms=2200, debug_only_modal=False)
             return
         try:
             top = frame.winfo_toplevel()
@@ -533,14 +544,16 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
         steps = flow if isinstance(flow, list) else []
         def _worker() -> None:
             try:
-                log_action("GUI", "run_preset", "start", preset_id=pid, steps_count=len(steps))
+                log_action("GUI", "run_preset", "start", preset_id=pid, preset_steps_count=len(steps))
                 toast(f"正在执行流程：{name} ...", 1800)
                 FlowExecutor.run_flow(steps, account_manager.get_settings())
-                log_action("GUI", "run_preset", "ok", preset_id=pid, steps_count=len(steps))
+                log_action("GUI", "run_preset", "ok", preset_id=pid, preset_steps_count=len(steps))
                 toast(f"已发送启动指令：{name}", 1800)
             except Exception as e:
-                log_action("GUI", "run_preset", "fail", preset_id=pid, steps_count=len(steps), reason=str(e))
-                toast(f"启动失败：{e}", 2500)
+                msg = str(e)
+                kind = "path_invalid" if any(x in msg for x in ["路径", "未配置", "不存在", "无效"]) else "preset_failed"
+                log_action("GUI", "run_preset", "fail", preset_id=pid, preset_steps_count=len(steps), reason=msg)
+                notify("error", "启动失败", f"启动失败：{msg}", kind=kind, toast_ms=2500, debug_only_modal=False)
         threading.Thread(target=_worker, daemon=True).start()
     ctk.CTkLabel(master=left_bar, text="预设：").pack(side="left", padx=(0, 6))
     opt = ctk.CTkOptionMenu(master=left_bar, values=["（加载中）"], width=220)

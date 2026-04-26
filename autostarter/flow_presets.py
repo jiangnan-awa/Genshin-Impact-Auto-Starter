@@ -93,7 +93,7 @@ class FlowPresetManager:
             flow = p.get("flow")
             if isinstance(flow, list):
                 total_steps += len(flow)
-        log_action("FlowPresets", "save", "start", presets_count=len(presets), steps_count=int(total_steps))
+        log_action("FlowPresets", "save", "start", presets_count=len(presets), total_steps_count=int(total_steps))
         try:
             os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
             tmp_path = self.file_path + ".tmp"
@@ -106,11 +106,11 @@ class FlowPresetManager:
                 "save",
                 "fail",
                 presets_count=len(presets),
-                steps_count=int(total_steps),
+                total_steps_count=int(total_steps),
                 reason=str(e),
             )
             raise
-        log_action("FlowPresets", "save", "ok", presets_count=len(presets), steps_count=int(total_steps))
+        log_action("FlowPresets", "save", "ok", presets_count=len(presets), total_steps_count=int(total_steps))
     def list(self) -> List[Dict[str, Any]]:
         presets = self.data.get("presets", [])
         return list(presets) if isinstance(presets, list) else []
@@ -143,7 +143,7 @@ class FlowPresetManager:
         sanitized = self._sanitize_flow(flow or [])
         p["flow"] = sanitized
         p["updated_at"] = _utc_now_iso()
-        log_action("FlowPresets", "update_flow", "ok", preset_id=str(preset_id), steps_count=len(sanitized))
+        log_action("FlowPresets", "update_flow", "ok", preset_id=str(preset_id), preset_steps_count=len(sanitized))
     def delete(self, preset_id: str) -> None:
         presets = self.list()
         new_presets = [p for p in presets if p.get("id") != preset_id]

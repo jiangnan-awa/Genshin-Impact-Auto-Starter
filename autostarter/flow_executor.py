@@ -1,6 +1,7 @@
 from __future__ import annotations
 import datetime
 import sys
+import threading
 import time
 from typing import Any, Callable, Mapping
 from .launcher import game_launcher as _default_game_launcher
@@ -88,22 +89,24 @@ def run_flow(
         if step_type == "signin":
             log_action("Flow", "signin", "start")
             call_hook("signin", "start")
-            try:
-                result = _run_signin()
-                call_hook("signin", result)
-                if bool(result.get("has_error")):
-                    try:
-                        print("\n".join(result.get("lines") or []), file=sys.stderr)
-                    except Exception:
-                        pass
-                    log_action("Flow", "signin", "fail", reason="has_error")
-                elif bool(result.get("skipped")):
-                    log_action("Flow", "signin", "skip", reason="skipped")
-                else:
-                    log_action("Flow", "signin", "ok")
-            except Exception as e:
-                log_action("Flow", "signin", "fail", reason=str(e))
-                raise
+            def _signin_worker() -> None:
+                try:
+                    result = _run_signin()
+                    call_hook("signin", result)
+                    if bool(result.get("has_error")):
+                        try:
+                            print("\n".join(result.get("lines") or []), file=sys.stderr)
+                        except Exception:
+                            pass
+                        log_action("Flow", "signin", "fail", reason="has_error")
+                    elif bool(result.get("skipped")):
+                        log_action("Flow", "signin", "skip", reason="skipped")
+                    else:
+                        log_action("Flow", "signin", "ok")
+                except Exception as e:
+                    log_action("Flow", "signin", "fail", reason=str(e))
+            t = threading.Thread(target=_signin_worker, name="autostarter-signin", daemon=False)
+            t.start()
             continue
         if step_type == "wait":
             seconds = step.get("seconds", 0)

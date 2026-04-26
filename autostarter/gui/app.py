@@ -66,6 +66,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return
     state.data["toast_cb"] = _toast_cb
     state.data["toast"] = _toast_cb
+    try:
+        from autostarter.account_manager import account_manager
+        from .notify import NotifyRequest, build_notifier
+        notify = build_notifier(
+            root=root,
+            toast_cb=_toast_cb,
+            debug_mode_getter=lambda: bool((account_manager.get_settings() or {}).get("debug_mode")),
+        )
+        state.data["notify"] = notify
+        state.data["NotifyRequest"] = NotifyRequest
+    except Exception:
+        pass
     current_page: dict[str, object] = {"widget": None, "key": ""}
     page_builders = {
         "accounts": accounts.build_page,

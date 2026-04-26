@@ -208,7 +208,6 @@ class GameLauncher:
                 line = process.stdout.readline()
                 if not line:
                     break
-                print(f"[BetterGI] {line.strip()}")
                 if "一条龙和配置组任务结束" in line:
                     log_action("Launcher", "BetterGI", "ok", method="cmdline", onedragon=True, mode="two_stage")
                     break
@@ -220,8 +219,12 @@ class GameLauncher:
                 except subprocess.TimeoutExpired:
                     process.kill()
             try:
-                subprocess.run(["taskkill", "/F", "/IM", os.path.basename(bettergi_path), "/T"], 
-                               capture_output=True, creationflags=0x08000000)
+                if process and process.poll() is None:
+                    subprocess.run(
+                        ["taskkill", "/F", "/IM", os.path.basename(bettergi_path), "/T"],
+                        capture_output=True,
+                        creationflags=0x08000000,
+                    )
             except Exception:
                 pass
             time.sleep(1)
@@ -331,7 +334,6 @@ class GameLauncher:
                 subprocess.Popen([launcher_path] + args, cwd=cwd, close_fds=True,
                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                  creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS)
-            time.sleep(1)
             log_action(
                 "Launcher",
                 "external_launcher",

@@ -55,10 +55,6 @@ def get_default_browser_type():
             prog_id = prog_id.lower()
             if "chrome" in prog_id:
                 return 'chrome'
-            elif "edge" in prog_id:
-                return 'edge'
-            elif "firefox" in prog_id:
-                return 'firefox'
     except Exception:
         pass
     return None
@@ -133,38 +129,7 @@ def create_driver(browser_type, status_win=None):
                 return webdriver.Chrome(options=options)
             except Exception as se:
                 raise Exception("无法启动 Chrome 浏览器。请检查网络连接或手动下载 chromedriver.exe 放在程序目录下。")
-        elif browser_type == 'edge':
-            options = EdgeOptions()
-            options.add_argument("--start-maximized")
-            options.add_argument("--disable-blink-features=AutomationControlled")
-            options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36")
-            driver_path = os.path.join(base_path, "msedgedriver.exe")
-            if not os.path.exists(driver_path):
-                if not auto_setup_driver('edge', status_callback=lambda msg: update_status(status_win, msg)):
-                    from .driver_downloader import get_edge_version, get_edge_download_url
-                    ver = get_edge_version()
-                    url = get_edge_download_url(ver) if ver else "https://developer.microsoft.com/en-us/microsoft-edge/tools/webdriver/"
-                    if status_win: status_win.destroy()
-                    show_manual_download_window("Edge", url, "msedgedriver.exe")
-                    return None
-            if os.path.exists(driver_path):
-                service = EdgeService(executable_path=driver_path)
-                return webdriver.Edge(service=service, options=options)
-            try:
-                update_status(status_win, "正在尝试调用系统内置驱动管理...")
-                return webdriver.Edge(service=None, options=options)
-            except Exception as se:
-                raise Exception("无法启动 Edge 浏览器。请检查网络连接或手动下载 msedgedriver.exe 放在程序目录下。")
-        elif browser_type == 'firefox':
-            options = FirefoxOptions()
-            options.add_argument("--start-maximized")
-            options.set_preference("dom.webdriver.enabled", False)
-            options.set_preference('useAutomationExtension', False)
-            driver_path = os.path.join(base_path, "geckodriver.exe")
-            if os.path.exists(driver_path):
-                service = FirefoxService(executable_path=driver_path)
-                return webdriver.Firefox(service=service, options=options)
-            return webdriver.Firefox(options=options)
+        raise Exception("当前版本仅支持 Chrome 浏览器获取 Cookie")
     except Exception as e:
         raise e
     return None
@@ -184,15 +149,7 @@ def update_status(win, message):
 def get_driver(status_win=None):
     default_browser = get_default_browser_type()
     update_status(status_win, f"检测到默认浏览器: {default_browser if default_browser else '未知'}\n正在准备启动...")
-    priority = []
-    if default_browser == 'chrome':
-        priority = ['chrome', 'edge', 'firefox']
-    elif default_browser == 'edge':
-        priority = ['edge', 'chrome', 'firefox']
-    elif default_browser == 'firefox':
-        priority = ['firefox', 'chrome', 'edge']
-    else:
-        priority = ['chrome', 'edge', 'firefox']
+    priority = ['chrome']
     last_error = ""
     for browser in priority:
         try:

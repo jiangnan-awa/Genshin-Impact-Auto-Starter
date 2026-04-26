@@ -248,26 +248,26 @@ class AccountManager:
             pass
         self._save_accounts_file()
     def _save_accounts_file(self) -> bool:
-        log_action("AccountManager", "save_accounts", "start", count=len(self.accounts))
+        log_action("AccountManager", "save_accounts", "start", accounts_count=len(self.accounts))
         try:
             os.makedirs(os.path.dirname(self.accounts_file), exist_ok=True)
             with open(self.accounts_file, "w", encoding="utf-8") as f:
                 json.dump({"accounts": self.accounts}, f, ensure_ascii=False, indent=2)
-            log_action("AccountManager", "save_accounts", "ok", count=len(self.accounts))
+            log_action("AccountManager", "save_accounts", "ok", accounts_count=len(self.accounts))
             return True
         except Exception:
-            log_action("AccountManager", "save_accounts", "fail", count=len(self.accounts), reason="exception")
+            log_action("AccountManager", "save_accounts", "fail", accounts_count=len(self.accounts), reason="exception")
             return False
     def _save_settings_file(self) -> bool:
-        log_action("AccountManager", "save_settings", "start", count=len(self.settings))
+        log_action("AccountManager", "save_settings", "start", settings_keys_count=len(self.settings))
         try:
             os.makedirs(os.path.dirname(self.settings_file), exist_ok=True)
             with open(self.settings_file, "w", encoding="utf-8") as f:
                 json.dump(self.settings, f, ensure_ascii=False, indent=2)
-            log_action("AccountManager", "save_settings", "ok", count=len(self.settings))
+            log_action("AccountManager", "save_settings", "ok", settings_keys_count=len(self.settings))
             return True
         except Exception:
-            log_action("AccountManager", "save_settings", "fail", count=len(self.settings), reason="exception")
+            log_action("AccountManager", "save_settings", "fail", settings_keys_count=len(self.settings), reason="exception")
             return False
     def load_accounts(self):
         self.load_data()
@@ -379,7 +379,7 @@ class AccountManager:
                         "update_account",
                         "ok",
                         account_id=str(account_id),
-                        count=len(self.accounts),
+                        accounts_count=len(self.accounts),
                         changed_keys=",".join(changed_keys),
                     )
                 else:
@@ -388,7 +388,7 @@ class AccountManager:
                         "update_account",
                         "fail",
                         account_id=str(account_id),
-                        count=len(self.accounts),
+                        accounts_count=len(self.accounts),
                         changed_keys=",".join(changed_keys),
                         reason="save_failed",
                     )
@@ -414,7 +414,7 @@ class AccountManager:
             "update_settings",
             "start",
             changed_keys=",".join(changed_keys),
-            count=len(kwargs),
+            changed_keys_count=len(kwargs),
         )
         self.settings.update(kwargs)
         ok = bool(self._save_settings_file())
@@ -424,7 +424,7 @@ class AccountManager:
                 "update_settings",
                 "ok",
                 changed_keys=",".join(changed_keys),
-                count=len(kwargs),
+                changed_keys_count=len(kwargs),
             )
         else:
             log_action(
@@ -432,7 +432,7 @@ class AccountManager:
                 "update_settings",
                 "fail",
                 changed_keys=",".join(changed_keys),
-                count=len(kwargs),
+                changed_keys_count=len(kwargs),
                 reason="save_failed",
             )
         if "debug_mode" in kwargs:

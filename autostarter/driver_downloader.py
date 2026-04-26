@@ -1,10 +1,9 @@
 import os
-import sys
 import requests
 import zipfile
-import platform
 import subprocess
 import re
+from .config_paths import detect_base_path
 try:
     import winreg  # type: ignore
 except ModuleNotFoundError:
@@ -31,27 +30,7 @@ def get_chrome_version():
         except:
             pass
     return None
-def get_edge_version():
-    try:
-        if winreg is not None:
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Edge\BLBeacon")
-            version, _ = winreg.QueryValueEx(key, "version")
-            return version
-    except:
-        try:
-            path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-            if os.path.exists(path):
-                cmd = f'(Get-Item "{path}").VersionInfo.FileVersion'
-                version = subprocess.check_output(['powershell', '-Command', cmd]).decode().strip()
-                return version
-        except:
-            pass
-    return None
 import time
-def get_base_path():
-    if getattr(sys, 'frozen', False):
-        return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.abspath(__file__))
 def download_file(url, save_path, retries=3, status_callback=None):
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -90,8 +69,6 @@ def get_chrome_download_url(version):
     if int(major_version) >= 115:
         return f"https://storage.googleapis.com/chrome-for-testing-public/{version}/win64/chromedriver-win64.zip"
     return f"https://chromedriver.storage.googleapis.com/{version}/chromedriver_win32.zip"
-def get_edge_download_url(version):
-    return f"https://msedgedriver.azureedge.net/{version}/edgedriver_win64.zip"
 def get_chrome_download_urls(version):
     major_version = version.split('.')[0]
     urls = []
@@ -124,7 +101,7 @@ def download_chromedriver(version, status_callback=None):
     if not version: return False
     urls = get_chrome_download_urls(version)
     if not urls: return False
-    base_path = get_base_path()
+    base_path = detect_base_path()
     for url in urls:
         source_name = "镜像站" if "npmmirror" in url else "官方站"
         msg = f"检测到 Chrome {version}\n正在尝试从 {source_name} 下载..."
@@ -147,40 +124,10 @@ def download_chromedriver(version, status_callback=None):
             except Exception:
                 if os.path.exists(temp_zip): os.remove(temp_zip)
     return False
-def download_edgedriver(version, status_callback=None):
-    if not version: return False
-    urls = [
-        f"https://msedgedriver.azureedge.net/{version}/edgedriver_win64.zip",
-        f"https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/msedgedriver/{version}/edgedriver_win64.zip"
-    ]
-    base_path = get_base_path()
-    for url in urls:
-        if status_callback:
-            status_callback(f"正在尝试下载 Edge 驱动 ({'官方' if 'azureedge' in url else '备份节点'})...")
-        temp_zip = os.path.join(base_path, "edgedriver.zip")
-        if download_file(url, temp_zip, status_callback=status_callback):
-            try:
-                if status_callback:
-                    status_callback("下载完成，正在解压驱动...")
-                with zipfile.ZipFile(temp_zip, 'r') as zip_ref:
-                    for file in zip_ref.namelist():
-                        if file.endswith('msedgedriver.exe'):
-                            target_path = os.path.join(base_path, "msedgedriver.exe")
-                            with open(target_path, 'wb') as f:
-                                f.write(zip_ref.read(file))
-                            break
-                os.remove(temp_zip)
-                return True
-            except Exception:
-                if os.path.exists(temp_zip): os.remove(temp_zip)
-    return False
 def auto_setup_driver(browser_type, status_callback=None):
     if browser_type == 'chrome':
         version = get_chrome_version()
         return download_chromedriver(version, status_callback=status_callback)
-    elif browser_type == 'edge':
-        version = get_edge_version()
-        return download_edgedriver(version, status_callback=status_callback)
     return False
 if __name__ == "__main__":
     auto_setup_driver('chrome')

@@ -24,7 +24,7 @@ class ToastManager:
         self.root = root
         self.bar = bar
     def show(self, message: str, options: Optional[ToastOptions] = None) -> None:  # pragma: no cover
-        _ = _import_customtkinter()  # 确保运行期依赖存在（避免 silent fail）
+        _ = _import_customtkinter()
         options = options or ToastOptions()
         if self.bar is not None:
             self.bar.set_text(message)

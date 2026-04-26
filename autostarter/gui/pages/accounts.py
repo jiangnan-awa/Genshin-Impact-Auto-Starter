@@ -22,6 +22,13 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
         maybe = state.data.get("toast") or state.data.get("toast_cb") or state.data.get("toast_callback")
         if callable(maybe):
             toast_cb = maybe  
+    notify_cb: Optional[Callable[..., None]] = None
+    NotifyRequest = None
+    if isinstance(getattr(state, "data", None), dict):
+        maybe2 = state.data.get("notify")
+        if callable(maybe2):
+            notify_cb = maybe2
+        NotifyRequest = state.data.get("NotifyRequest")
     def toast(msg: str) -> None:
         if toast_cb is None:
             return
@@ -29,6 +36,15 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
             toast_cb(msg)
         except Exception:
             return
+    def notify(level: str, title: str, message: str, *, kind: str, toast_ms: int = 2200, debug_only_modal: bool = False) -> None:
+        if notify_cb is None or NotifyRequest is None:
+            toast(message)
+            return
+        try:
+            req = NotifyRequest(level=level, title=title, message=message, kind=kind, toast_ms=int(toast_ms), debug_only_modal=bool(debug_only_modal))
+            notify_cb(req)
+        except Exception:
+            toast(message)
     accounts: List[Dict[str, Any]] = []
     settings: Dict[str, Any] = {}
     selected_id: Optional[str] = None
@@ -66,7 +82,8 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
             if ok:
                 toast("已自动保存账号")
         except Exception as e:  
-            toast(f"保存失败：{e}")
+            log_action("GUI", "save", "fail", page="accounts", account_id=str(acc_id), reason=str(e))
+            notify("error", "保存失败", f"保存失败：{e}", kind="save_failed", toast_ms=2400, debug_only_modal=True)
     def _save_settings_now() -> None:
         try:
             b.update_settings(
@@ -170,6 +187,7 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
         worker: Callable[[Callable[[str], None]], Any],
         on_success: Callable[[Any], None],
         enable_qr: bool = False,
+        error_kind: str = "",
     ) -> None:
         win = ctk.CTkToplevel()
         try:
@@ -298,6 +316,8 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
                 result = worker(_StatusProxy())
             except Exception as e:  
                 status_callback(f"失败：{e}")
+                if error_kind:
+                    notify("error", "失败", f"{title}失败：{e}", kind=error_kind, toast_ms=2800, debug_only_modal=False)
                 return
             def _finish():
                 try:
@@ -405,7 +425,7 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
             trigger_save_account()
             log_action("GUI", "auto_get_game_cookie", "ok", cookie_len=len(cookie_val or ""))
             toast("已填入游戏 Cookie")
-        _run_bg_task_with_status(title="自动获取游戏 Cookie", worker=worker, on_success=on_success)
+        _run_bg_task_with_status(title="自动获取游戏 Cookie", worker=worker, on_success=on_success, error_kind="path_invalid")
     btn_game_auto = forms.make_button(row_game_btn, "自动获取", command=_auto_get_game_cookie)
     btn_game_auto.pack(side="right", padx=(8, 0))
     txt_game_cookie = ctk.CTkTextbox(master=sf_cookie, height=120)
@@ -488,7 +508,8 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
     def _parse_fill_cookie():
         parsed = b.parse_cookie(cookie_plain.get("miyoushe", ""))
         if not parsed:
-            toast("未解析到字段（请检查 Cookie）")
+            log_action("GUI", "parse_cookie", "fail", reason="empty_fields")
+            notify("warn", "提示", "未解析到字段（请检查 Cookie）", kind="cookie_invalid", toast_ms=2400, debug_only_modal=False)
             return
         set_suspend(True)
         try:
@@ -723,7 +744,8 @@ def build_page(parent: object, state: Optional[AppState] = None) -> object:
         forms.make_button(btn_row, "创建", command=_ok).grid(row=0, column=2)
     def _delete_account():
         if not selected_id:
-            toast("请先选择账号")
+            log_action("GUI", "guard", "skip", page="accounts", reason="no_selected_account")
+            notify("warn", "提示", "请先选择账号", kind="action_required", toast_ms=2200, debug_only_modal=False)
             return
         acc = _find_account(selected_id)
         name = str((acc or {}).get("name", selected_id))
